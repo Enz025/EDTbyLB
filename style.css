@@ -665,33 +665,172 @@ input:focus, textarea:focus { border-color: var(--accent); }
 }
 .empty strong { color: var(--fg); display: block; margin-bottom: 6px; }
 
-/* === Vue semaine (grille) === */
-.week-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-@media (min-width: 720px) {
-  .week-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (min-width: 1024px) {
-  .week-grid { grid-template-columns: repeat(3, 1fr); }
-}
-.day-col {
-  padding: 12px;
+/* === Vue semaine en TIMELINE (style Google Calendar) === */
+.week-timeline {
   border-radius: var(--radius-md);
-  background: var(--card);
-  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
 }
-.day-col h3 {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: var(--muted);
+.wt-header {
+  display: grid;
+  grid-template-columns: 36px repeat(6, 1fr);
+  background: var(--card-strong);
+  position: sticky;
+  top: calc(var(--safe-top) + 4px);
+  z-index: 4;
+  border-bottom: 1px solid var(--border);
+}
+.wt-corner {}
+.wt-daycell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 2px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--fg-soft);
+  font-variant-numeric: tabular-nums;
+  transition: background .15s ease;
+}
+.wt-daycell:active { background: var(--card); }
+.wt-daycell .dow {
+  font-size: 9.5px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  opacity: 0.7;
 }
-.day-col .course { padding: 10px 12px; }
-.day-col .course .title { font-size: 14px; }
+.wt-daycell .dnum {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-top: 2px;
+  color: var(--fg);
+}
+.wt-daycell.today .dnum { color: var(--accent); font-weight: 800; }
+.wt-daycell.today .dow  { color: var(--accent); opacity: 1; }
+
+.wt-body {
+  display: grid;
+  grid-template-columns: 36px repeat(6, 1fr);
+  position: relative;
+  background: var(--card-strong);
+}
+.wt-hourcol {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+.wt-hourrow {
+  height: var(--hour-px);
+  font-size: 9.5px;
+  color: var(--muted);
+  text-align: right;
+  padding: 2px 4px 0 0;
+  font-variant-numeric: tabular-nums;
+  border-top: 1px solid var(--border);
+}
+.wt-hourrow:first-child { border-top: none; padding-top: 0; }
+
+.wt-daycol {
+  position: relative;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+.wt-daycol:first-of-type { border-left: none; }
+.wt-daycol.today {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.wt-hourline {
+  height: var(--hour-px);
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.wt-hourline:first-child { border-top: none; }
+
+.wt-block {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--type-color) 28%, var(--card-strong)),
+      color-mix(in srgb, var(--type-color) 16%, var(--card-strong)));
+  border: 1px solid color-mix(in srgb, var(--type-color) 45%, transparent);
+  border-left: 3px solid var(--type-color);
+  border-radius: 7px;
+  padding: 3px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 10px;
+  color: var(--fg);
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  z-index: 1;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--type-color) 25%, transparent);
+  transition: transform .1s ease;
+}
+.wt-block:active { transform: scale(0.97); }
+.wt-bbadge {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--type-color);
+  text-transform: uppercase;
+  line-height: 1;
+}
+.wt-btitle {
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+.wt-broom {
+  font-size: 9px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-top: auto;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Trait "maintenant" rouge sur la colonne du jour courant */
+.wt-now {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  height: 2px;
+  background: var(--ex);
+  z-index: 5;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--ex) 60%, transparent);
+}
+.wt-now::before {
+  content: '';
+  position: absolute;
+  left: -4px; top: -3px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ex);
+}
+
+/* Mobile : cacher le badge si bloc trop petit (économie d'espace) */
+@media (max-width: 380px) {
+  .wt-block { font-size: 9.5px; padding: 2px 3px; }
+  .wt-btitle { font-size: 10px; -webkit-line-clamp: 2; }
+  .wt-broom { font-size: 8.5px; }
+  .wt-bbadge { font-size: 8px; }
+}
 
 /* === Settings dialog === */
 .settings-dlg {

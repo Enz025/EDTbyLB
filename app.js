@@ -643,30 +643,149 @@
     }
   }
 
+  // === Vue semaine en TIMELINE (style Google Calendar) ===
   function renderWeek() {
     clearNode(content);
     const start = startOfWeek(CURSOR);
-    const grid = document.createElement('div');
-    grid.className = 'week-grid';
-    for (let i = 0; i < 6; i++) { // lun → sam
-      const day = addDays(start, i);
-      const col = document.createElement('section');
-      col.className = 'day-col';
-      const h = document.createElement('h3');
-      h.textContent = `${FR_DAYS[day.getDay()]} ${day.getDate()}`;
-      col.appendChild(h);
-      const list = eventsForDay(day);
-      if (!list.length) {
-        const p = document.createElement('p');
-        p.className = 'muted';
-        p.textContent = '—';
-        col.appendChild(p);
-      } else {
-        for (const ev of list) col.appendChild(buildCourseCard(ev, true));
+    const today = new Date();
+    const HOUR_PX = 56;
+    const DAYS_COUNT = 6; // Lun → Sam
+
+    // Détecte la plage horaire utile en scannant les événements de la semaine
+    let minH = 24, maxH = 0;
+    for (let i = 0; i < DAYS_COUNT; i++) {
+      const d = addDays(start, i);
+      for (const ev of EVENTS) {
+        if (!sameDay(ev.start, d)) continue;
+        const h1 = ev.start.getHours();
+        const h2 = ev.end.getHours() + (ev.end.getMinutes() > 0 ? 1 : 0);
+        if (h1 < minH) minH = h1;
+        if (h2 > maxH) maxH = h2;
       }
-      grid.appendChild(col);
     }
-    content.appendChild(grid);
+    // Aucun cours cette semaine → message
+    if (minH >= maxH) {
+      const e = buildEmpty('Semaine vide', 'Pas de cours cette semaine.');
+      content.appendChild(e);
+      return;
+    }
+    // Marges horaires confortables
+    minH = Math.max(7, minH);
+    maxH = Math.min(22, Math.max(maxH, minH + 2));
+    const hoursCount = maxH - minH;
+
+    const tl = document.createElement('section');
+    tl.className = 'week-timeline glass';
+
+    // Header sticky : jours
+    const header = document.createElement('div');
+    header.className = 'wt-header';
+    const corner = document.createElement('div'); corner.className = 'wt-corner';
+    header.appendChild(corner);
+    const DOW = ['LUN','MAR','MER','JEU','VEN','SAM'];
+    for (let i = 0; i < DAYS_COUNT; i++) {
+      const day = addDays(start, i);
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'wt-daycell';
+      if (sameDay(day, today)) cell.classList.add('today');
+      const dow = document.createElement('span'); dow.className = 'dow'; dow.textContent = DOW[i];
+      const num = document.createElement('span'); num.className = 'dnum'; num.textContent = day.getDate();
+      cell.appendChild(dow); cell.appendChild(num);
+      cell.addEventListener('click', () => {
+        haptic(8);
+        CURSOR = new Date(day);
+        VIEW = 'day';
+        render();
+      });
+      header.appendChild(cell);
+    }
+    tl.appendChild(header);
+
+    // Corps : col heures + 6 col jours, blocs positionnés en absolu
+    const body = document.createElement('div');
+    body.className = 'wt-body';
+    body.style.setProperty('--hour-px', HOUR_PX + 'px');
+    body.style.height = (hoursCount * HOUR_PX) + 'px';
+
+    // Colonne des heures
+    const hourCol = document.createElement('div');
+    hourCol.className = 'wt-hourcol';
+    for (let h = minH; h < maxH; h++) {
+      const row = document.createElement('div');
+      row.className = 'wt-hourrow';
+      row.textContent = h + 'h';
+      hourCol.appendChild(row);
+    }
+    body.appendChild(hourCol);
+
+    // Colonnes des jours
+    for (let i = 0; i < DAYS_COUNT; i++) {
+      const day = addDays(start, i);
+      const col = document.createElement('div');
+      col.className = 'wt-daycol';
+      if (sameDay(day, today)) col.classList.add('today');
+
+      // Lignes horaires de fond
+      for (let h = minH; h < maxH; h++) {
+        const line = document.createElement('div');
+        line.className = 'wt-hourline';
+        col.appendChild(line);
+      }
+
+      // Cours du jour : blocs positionnés
+      const dayEvs = eventsForDay(day);
+      for (const ev of dayEvs) {
+        const startMin = (ev.start.getHours() - minH) * 60 + ev.start.getMinutes();
+        const durMin = Math.max(15, (ev.end - ev.start) / 60000);
+        const top = (startMin / 60) * HOUR_PX;
+        const height = Math.max(22, (durMin / 60) * HOUR_PX - 2);
+
+        const block = document.createElement('button');
+        block.type = 'button';
+        block.className = 'wt-block';
+        block.style.top = top + 'px';
+        block.style.height = height + 'px';
+        block.style.setProperty('--type-color', typeColorVar(ev.type));
+
+        const badge = document.createElement('span'); badge.className = 'wt-bbadge';
+        badge.textContent = TYPE_LABEL[ev.type] || 'COURS';
+        const ttl = document.createElement('span'); ttl.className = 'wt-btitle';
+        ttl.textContent = ev.title;
+        block.appendChild(badge);
+        block.appendChild(ttl);
+        if (ev.room && height >= 40) {
+          const rm = document.createElement('span'); rm.className = 'wt-broom';
+          rm.textContent = ev.room;
+          block.appendChild(rm);
+        }
+        block.addEventListener('click', () => openDetails(ev));
+        col.appendChild(block);
+      }
+
+      // Trait "maintenant" sur la colonne du jour courant
+      if (sameDay(day, today)) {
+        const curMin = (today.getHours() - minH) * 60 + today.getMinutes();
+        if (curMin >= 0 && curMin <= hoursCount * 60) {
+          const now = document.createElement('div');
+          now.className = 'wt-now';
+          now.style.top = (curMin / 60 * HOUR_PX) + 'px';
+          col.appendChild(now);
+        }
+      }
+      body.appendChild(col);
+    }
+
+    tl.appendChild(body);
+    content.appendChild(tl);
+
+    // Scroll auto sur l'heure courante (ou 8h par défaut)
+    requestAnimationFrame(() => {
+      const targetH = sameDay(today, addDays(start, 0)) || sameDay(today, addDays(start, 5))
+        ? today.getHours() : minH;
+      const offset = Math.max(0, (targetH - minH - 1) * HOUR_PX);
+      window.scrollTo({ top: window.scrollY + offset, behavior: 'auto' });
+    });
   }
 
   function buildEmpty(title, sub) {
