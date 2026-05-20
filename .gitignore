@@ -1,0 +1,23 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Éditeurs / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Outils internes
+.claude/
+
+# Logs / temporaires
+*.log
+.tmp/
+.cache/
+
+# Secrets (par précaution — ne JAMAIS committer)
+.env
+.env.*
+secrets.json

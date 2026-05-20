@@ -1,0 +1,382 @@
+/* ============================
+   EDT — Glassmorphism, mobile-first
+   ============================ */
+
+:root {
+  --bg: #f2f3f8;
+  --bg-grad-1: #eef0fb;
+  --bg-grad-2: #f7e9f4;
+  --bg-grad-3: #e6f1ff;
+  --fg: #0c0d12;
+  --fg-soft: #4a4d5a;
+  --muted: #8b8f9c;
+  --card: rgba(255, 255, 255, 0.62);
+  --card-strong: rgba(255, 255, 255, 0.85);
+  --border: rgba(20, 22, 36, 0.08);
+  --shadow: 0 10px 30px rgba(20, 22, 36, 0.08), 0 2px 6px rgba(20, 22, 36, 0.04);
+  --accent: #0a84ff;
+  --danger: #ff3b30;
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 12px;
+  --blur: saturate(180%) blur(22px);
+
+  /* Couleurs par type de cours */
+  --cm: #a5b4fc;  /* indigo pastel */
+  --td: #86efac;  /* vert pastel */
+  --tp: #fdba74;  /* orange pastel */
+  --ex: #fca5a5;  /* rose / exam */
+  --other: #d8b4fe;
+
+  /* Safe areas iOS */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a0f;
+    --bg-grad-1: #0e1020;
+    --bg-grad-2: #1a0e22;
+    --bg-grad-3: #08131f;
+    --fg: #f3f4f8;
+    --fg-soft: #c6c8d3;
+    --muted: #8a8d99;
+    --card: rgba(28, 30, 44, 0.55);
+    --card-strong: rgba(28, 30, 44, 0.82);
+    --border: rgba(255, 255, 255, 0.08);
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+    --accent: #0a84ff;
+
+    --cm: #6366f1;
+    --td: #22c55e;
+    --tp: #f97316;
+    --ex: #ef4444;
+    --other: #a855f7;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: contain;
+  min-height: 100vh;
+}
+
+body {
+  background:
+    radial-gradient(1100px 800px at -10% -20%, var(--bg-grad-1), transparent 60%),
+    radial-gradient(900px 700px at 110% 10%, var(--bg-grad-2), transparent 55%),
+    radial-gradient(1200px 900px at 50% 120%, var(--bg-grad-3), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+input, textarea {
+  font: inherit; color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  width: 100%;
+  outline: none;
+}
+input:focus, textarea:focus { border-color: var(--accent); }
+
+/* === Layout === */
+.app {
+  max-width: 920px;
+  margin: 0 auto;
+  padding:
+    calc(var(--safe-top) + 12px)
+    calc(var(--safe-right) + 12px)
+    calc(var(--safe-bottom) + 12px)
+    calc(var(--safe-left) + 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.glass {
+  background: var(--card);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+/* === Topbar === */
+.topbar {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  position: sticky;
+  top: calc(var(--safe-top) + 8px);
+  z-index: 5;
+}
+.title-block { text-align: center; min-width: 0; }
+.title-block h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.title-block .sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.icon-btn {
+  width: 44px; height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--card-strong);
+  font-size: 22px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .15s ease;
+}
+.icon-btn:active { transform: scale(0.94); }
+
+/* === Vue switch (segmented) === */
+.viewswitch {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  align-items: center;
+}
+.seg {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--fg-soft);
+  transition: background .15s ease, color .15s ease;
+}
+.seg.active {
+  background: var(--card-strong);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+}
+#todayBtn, #settingsBtn { flex: 0 0 auto; padding: 10px 14px; }
+
+/* === Content === */
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 24px;
+  touch-action: pan-y;
+}
+
+/* === Carte cours === */
+.course {
+  position: relative;
+  padding: 14px 16px 14px 18px;
+  border-radius: var(--radius-md);
+  background: var(--card-strong);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.course::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 5px;
+  background: var(--type-color, var(--other));
+}
+.course .row1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.course .title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.course .time {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--fg-soft);
+  white-space: nowrap;
+}
+.course .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.course .badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--type-color) 25%, transparent);
+  color: var(--type-color);
+  text-transform: uppercase;
+}
+
+/* === Empty / Day header === */
+.day-section h2 {
+  margin: 14px 6px 6px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.empty strong { color: var(--fg); display: block; margin-bottom: 6px; }
+
+/* === Vue semaine (grille) === */
+.week-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+@media (min-width: 720px) {
+  .week-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1024px) {
+  .week-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.day-col {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.day-col h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.day-col .course { padding: 10px 12px; }
+.day-col .course .title { font-size: 14px; }
+
+/* === Settings dialog === */
+.settings-dlg {
+  border: none;
+  background: transparent;
+  padding: 0;
+  max-width: 560px;
+  width: calc(100% - 24px);
+}
+.settings-dlg::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.settings-form {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-radius: var(--radius-lg);
+}
+.settings-form h2 { margin: 0; font-size: 18px; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--fg-soft); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row.right { justify-content: flex-end; }
+.btn {
+  border: 1px solid var(--border);
+  background: var(--card-strong);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 14px;
+}
+.btn.primary { background: var(--accent); color: white; border-color: transparent; }
+.btn.danger { background: var(--danger); color: white; border-color: transparent; }
+details summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 6px 0;
+}
+.muted { color: var(--muted); font-size: 12px; }
+textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+.artois-help {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
+.artois-help summary { font-weight: 700; color: var(--fg); }
+.tuto {
+  margin: 8px 0 4px;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--fg-soft);
+  line-height: 1.5;
+}
+.tuto li { margin-bottom: 6px; }
+.tuto code {
+  font-size: 11px;
+  background: var(--card-strong);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* === Toast === */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 18px);
+  transform: translateX(-50%) translateY(20px);
+  background: var(--card-strong);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+  z-index: 10;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

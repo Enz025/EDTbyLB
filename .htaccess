@@ -1,0 +1,52 @@
+# ============================================================
+# .htaccess — Hostinger : sécurité, MIME, cache, HTTPS
+# ============================================================
+
+# --- Force HTTPS (requis pour PWA iOS) ---
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# --- Types MIME corrects ---
+AddType application/manifest+json .webmanifest .json
+AddType text/cache-manifest        .appcache
+AddType image/x-icon               .ico
+AddType text/calendar              .ics
+
+# --- En-têtes de sécurité ---
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "no-referrer"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), interest-cohort=()"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+
+    # Le Service Worker ne doit JAMAIS être mis en cache fort
+    <FilesMatch "service-worker\.js$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+
+    # Manifest : cache court
+    <FilesMatch "manifest\.json$">
+        Header set Cache-Control "public, max-age=3600"
+    </FilesMatch>
+
+    # Assets : cache long (le SW gère l'invalidation via VERSION)
+    <FilesMatch "\.(css|js|png|jpg|jpeg|webp|svg|ico)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+</IfModule>
+
+# --- Compression ---
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json text/calendar
+</IfModule>
+
+# --- Bloquer accès aux fichiers cachés / sensibles ---
+<FilesMatch "^\.(?!well-known)|\.md$|^DEPLOY">
+    Require all denied
+</FilesMatch>

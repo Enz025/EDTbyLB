@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="description" content="Emploi du temps étudiant — léger, rapide, hors-ligne." />
+
+  <!-- Sécurité : CSP stricte, pas de scripts inline tiers -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta name="referrer" content="no-referrer" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0a0a0f" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f7f7fb" media="(prefers-color-scheme: light)" />
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="EDT" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png" />
+
+  <title>EDT</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="topbar glass">
+      <button class="icon-btn" id="prevBtn" aria-label="Précédent">‹</button>
+      <div class="title-block">
+        <h1 id="dayTitle">—</h1>
+        <p id="dateSub" class="sub">—</p>
+      </div>
+      <button class="icon-btn" id="nextBtn" aria-label="Suivant">›</button>
+    </header>
+
+    <nav class="viewswitch glass" role="tablist" aria-label="Vue">
+      <button class="seg active" data-view="day" role="tab" aria-selected="true">Jour</button>
+      <button class="seg" data-view="week" role="tab" aria-selected="false">Semaine</button>
+      <button class="seg" id="todayBtn">Aujourd'hui</button>
+      <button class="seg" id="settingsBtn" aria-label="Réglages">⚙︎</button>
+    </nav>
+
+    <main id="content" class="content" aria-live="polite">
+      <!-- rendu dynamique -->
+    </main>
+
+    <!-- Dialogue réglages : import .ics / JSON -->
+    <dialog id="settingsDlg" class="settings-dlg">
+      <form method="dialog" class="settings-form glass" id="settingsForm">
+        <h2>Réglages</h2>
+
+        <details class="artois-help" open>
+          <summary>📚 Université d'Artois — Lens</summary>
+          <ol class="tuto">
+            <li>Ouvre le portail ADE et connecte-toi avec ton compte univ-artois.
+              <div class="row" style="margin-top:6px">
+                <a class="btn" href="https://ade-consult.univ-artois.fr/" target="_blank" rel="noopener noreferrer">Ouvrir ADE</a>
+              </div>
+            </li>
+            <li>Dans l'arbre des ressources, sélectionne ton <strong>groupe / promo</strong> (ex. « L2 INFO Lens »).</li>
+            <li>En bas à gauche, clique sur l'icône <strong>« Exporter mon agenda »</strong> (📅).</li>
+            <li>Choisis une plage large (toute l'année universitaire), puis <strong>« Générer URL »</strong>.</li>
+            <li>Copie l'URL <code>.ics</code> obtenue et colle-la ci-dessous, puis « Importer le lien ».</li>
+          </ol>
+          <p class="muted">L'URL est récupérée via <code>proxy.php</code> (même domaine que l'app) — aucun service tiers n'est contacté.</p>
+        </details>
+
+        <label class="field">
+          <span>URL du calendrier (.ics)</span>
+          <input type="url" id="icsUrl" placeholder="https://ade-consult.univ-artois.fr/jsp/custom/modules/plannings/anonymous_cal.jsp?resources=…" inputmode="url" autocomplete="off" />
+        </label>
+
+        <div class="row">
+          <button type="button" class="btn primary" id="fetchIcsBtn">Importer le lien</button>
+          <button type="button" class="btn" id="importFileBtn">Importer fichier .ics</button>
+          <input type="file" id="icsFile" accept=".ics,text/calendar" hidden />
+        </div>
+
+        <details>
+          <summary>Coller du JSON manuellement</summary>
+          <textarea id="jsonInput" rows="8" spellcheck="false" placeholder='[{"title":"Maths CM","type":"CM","start":"2026-05-20T08:00","end":"2026-05-20T10:00","room":"A101","teacher":"M. Durand"}]'></textarea>
+          <button type="button" class="btn primary" id="loadJsonBtn">Charger le JSON</button>
+        </details>
+
+        <details>
+          <summary>Données stockées</summary>
+          <p class="muted" id="storageInfo">—</p>
+          <button type="button" class="btn danger" id="clearBtn">Tout effacer</button>
+        </details>
+
+        <div class="row right">
+          <button type="submit" class="btn">Fermer</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
