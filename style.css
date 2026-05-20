@@ -118,28 +118,150 @@ input:focus, textarea:focus { border-color: var(--accent); }
 /* === Topbar === */
 .topbar {
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: 40px 1fr 40px 40px;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 8px 10px;
   position: sticky;
   top: calc(var(--safe-top) + 8px);
   z-index: 5;
 }
-.title-block { text-align: center; min-width: 0; }
+.title-block {
+  text-align: center;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 4px 6px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.title-block:active { background: var(--card); }
 .title-block h1 {
   margin: 0;
-  font-size: 17px;
-  font-weight: 650;
+  font-size: 16px;
+  font-weight: 700;
   letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--fg);
 }
 .title-block .sub {
   margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* === Sync button === */
+.sync-btn { font-size: 16px; }
+.sync-icon {
+  display: inline-block;
+  line-height: 1;
+  transition: color .2s ease;
+}
+.sync-btn.syncing .sync-icon {
+  animation: spin 0.9s linear infinite;
+  color: var(--accent);
+}
+.sync-btn.synced .sync-icon { color: var(--td); }
+.sync-btn.error .sync-icon  { color: var(--ex); }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* === Week pills (Lun 18 / Mar 19 / Mer 20…) === */
+.weekpills {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.weekpills::-webkit-scrollbar { display: none; }
+.day-pill {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 14px;
+  color: var(--fg-soft);
+  transition: background .15s ease, color .15s ease;
+  font-variant-numeric: tabular-nums;
+}
+.day-pill .dow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.day-pill .dnum {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-top: 1px;
+}
+.day-pill .dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: 3px;
+  opacity: 0;
+}
+.day-pill.has-events .dot { opacity: 0.7; }
+.day-pill.today {
+  color: var(--accent);
+}
+.day-pill.today .dnum { font-weight: 800; }
+.day-pill.active {
+  background: var(--card-strong);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+}
+.day-pill.active.today { color: var(--accent); }
+.day-pill.weekend { opacity: 0.6; }
+
+/* === Pull-to-refresh indicator === */
+.pull-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-size: 12px;
   color: var(--muted);
+  height: 0;
+  overflow: hidden;
+  transition: height .2s ease, opacity .2s ease;
+  opacity: 0;
+}
+.pull-indicator.pulling { height: 38px; opacity: 1; }
+.pull-indicator.ready .pull-arrow { transform: rotate(180deg); color: var(--accent); }
+.pull-indicator.loading .pull-arrow { animation: spin 0.9s linear infinite; color: var(--accent); }
+.pull-arrow {
+  display: inline-block;
+  font-size: 14px;
+  transition: transform .2s ease;
 }
 .icon-btn {
   width: 44px; height: 44px;

@@ -33,12 +33,18 @@
   <div class="app" id="app">
     <header class="topbar glass">
       <button class="icon-btn" id="prevBtn" aria-label="Précédent">‹</button>
-      <div class="title-block">
+      <button class="title-block" id="titleBtn" aria-label="Choisir une date">
         <h1 id="dayTitle">—</h1>
         <p id="dateSub" class="sub">—</p>
-      </div>
+      </button>
+      <button class="icon-btn sync-btn" id="syncBtn" aria-label="Synchroniser">
+        <span class="sync-icon" id="syncIcon">↻</span>
+      </button>
       <button class="icon-btn" id="nextBtn" aria-label="Suivant">›</button>
+      <input type="date" id="datePicker" class="visually-hidden" />
     </header>
+
+    <nav class="weekpills glass" id="weekPills" aria-label="Jours de la semaine"></nav>
 
     <nav class="viewswitch glass" role="tablist" aria-label="Vue">
       <button class="seg active" data-view="day" role="tab" aria-selected="true">Jour</button>
@@ -46,6 +52,11 @@
       <button class="seg" id="todayBtn">Aujourd'hui</button>
       <button class="seg" id="settingsBtn" aria-label="Réglages">⚙︎</button>
     </nav>
+
+    <div class="pull-indicator" id="pullIndicator" aria-hidden="true">
+      <span class="pull-arrow" id="pullArrow">↓</span>
+      <span class="pull-label" id="pullLabel">Tirer pour rafraîchir</span>
+    </div>
 
     <main id="content" class="content" aria-live="polite">
       <!-- rendu dynamique -->
@@ -116,6 +127,7 @@
           <div class="desc" id="detailsDesc"></div>
         </div>
         <div class="row right">
+          <button type="button" class="btn" id="copyDetailsBtn">Copier</button>
           <button type="submit" class="btn primary">Fermer</button>
         </div>
       </form>

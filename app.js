@@ -12,10 +12,11 @@
 
   // ---------- État global ----------
   const STORAGE_KEYS = {
-    events: 'edt.events.v1',
-    source: 'edt.source.v1', // { type:'ics'|'json', url?:string, importedAt:number }
-    view:   'edt.view.v1',   // 'day' | 'week'
-    cursor: 'edt.cursor.v1'  // ISO date (YYYY-MM-DD) du jour/semaine affiché
+    events:   'edt.events.v1',
+    source:   'edt.source.v1', // { type:'ics'|'json', url?:string, importedAt:number }
+    view:     'edt.view.v1',   // 'day' | 'week'
+    cursor:   'edt.cursor.v1', // ISO date (YYYY-MM-DD) du jour/semaine affiché
+    autoSync: 'edt.autoSync.v1' // '1' (on) | '0' (off)
   };
 
   /** @type {Array<{id:string, title:string, type:string, start:Date, end:Date, room:string, teacher:string, description:string}>} */
@@ -53,6 +54,15 @@
   const detailsDescWrap= $('#detailsDescWrap');
   const detailsDesc    = $('#detailsDesc');
   const detailsContent = $('#detailsContent');
+  const copyDetailsBtn = $('#copyDetailsBtn');
+  const syncBtn   = $('#syncBtn');
+  const titleBtn  = $('#titleBtn');
+  const datePicker= $('#datePicker');
+  const weekPills = $('#weekPills');
+  const pullIndicator = $('#pullIndicator');
+  const pullLabel = $('#pullLabel');
+
+  let LAST_DETAILS_EV = null;
 
   // ---------- Utilitaires ----------
   function toast(msg, ms = 2200) {
@@ -561,6 +571,7 @@
   }
 
   function openDetails(ev) {
+    LAST_DETAILS_EV = ev;
     const fmtFull = (d) => d.toLocaleString('fr-FR', {
       weekday: 'short', day: '2-digit', month: 'short',
       hour: '2-digit', minute: '2-digit'
@@ -585,6 +596,7 @@
 
   function render() {
     renderHeader();
+    renderWeekPills();
     if (VIEW === 'day') renderDay(); else renderWeek();
     saveStr(STORAGE_KEYS.view, VIEW);
     saveStr(STORAGE_KEYS.cursor, toISODate(CURSOR));
@@ -594,6 +606,48 @@
       b.classList.toggle('active', active);
       b.setAttribute('aria-selected', active ? 'true' : 'false');
     });
+  }
+
+  // === Bandeau de pills jour de la semaine ===
+  function renderWeekPills() {
+    clearNode(weekPills);
+    const start = startOfWeek(CURSOR);
+    const today = new Date();
+    const DOW = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(start, i);
+      const btn = document.createElement('button');
+      btn.className = 'day-pill';
+      if (sameDay(d, CURSOR)) btn.classList.add('active');
+      if (sameDay(d, today))  btn.classList.add('today');
+      if (i >= 5)              btn.classList.add('weekend');
+      const hasEv = EVENTS.some(ev => sameDay(ev.start, d));
+      if (hasEv) btn.classList.add('has-events');
+
+      const dow = document.createElement('span'); dow.className = 'dow'; dow.textContent = DOW[i];
+      const num = document.createElement('span'); num.className = 'dnum'; num.textContent = d.getDate();
+      const dot = document.createElement('span'); dot.className = 'dot';
+      btn.appendChild(dow); btn.appendChild(num); btn.appendChild(dot);
+
+      btn.addEventListener('click', () => {
+        CURSOR = new Date(d);
+        haptic(8);
+        render();
+      });
+      weekPills.appendChild(btn);
+    }
+    // scroll horizontal pour centrer l'actif sur mobile
+    requestAnimationFrame(() => {
+      const active = weekPills.querySelector('.day-pill.active');
+      if (active && active.scrollIntoView) {
+        active.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' });
+      }
+    });
+  }
+
+  // === Vibration tactile (no-op sur iOS Safari) ===
+  function haptic(ms) {
+    if (navigator.vibrate) { try { navigator.vibrate(ms); } catch {} }
   }
 
   // ---------- Navigation ----------
@@ -624,6 +678,7 @@
       const dt = Date.now() - t0;
       x0 = y0 = null;
       if (dt < 500 && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        haptic(8);
         step(dx < 0 ? +1 : -1);
       }
     }, { passive: true });
@@ -728,6 +783,133 @@
     toast('Données effacées.');
   });
 
+  // === Sync UI ===
+  function setSyncState(state) { // 'idle' | 'syncing' | 'synced' | 'error'
+    syncBtn.classList.remove('syncing', 'synced', 'error');
+    if (state !== 'idle') syncBtn.classList.add(state);
+  }
+
+  // === Auto-refresh depuis la dernière URL ADE enregistrée ===
+  async function autoRefresh({ silent = true } = {}) {
+    const src = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.source) || 'null'); } catch { return null; } })();
+    if (!src || src.type !== 'ics' || !src.url) return false;
+    setSyncState('syncing');
+    try {
+      const url = safeIcsUrl(src.url);
+      const fetchUrl = resolveFetchUrl(url);
+      const res = await fetch(fetchUrl, { credentials: 'omit', redirect: 'follow' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      const evs = parseICS(text);
+      if (!evs.length) throw new Error('Vide');
+      EVENTS = evs;
+      persistEvents();
+      localStorage.setItem(STORAGE_KEYS.source, JSON.stringify({ ...src, importedAt: Date.now() }));
+      setSyncState('synced');
+      if (!silent) toast(`${evs.length} cours · à jour`, 2500);
+      // garde l'icône "synced" 2.5s puis revient à idle
+      setTimeout(() => setSyncState('idle'), 2500);
+      return true;
+    } catch (e) {
+      setSyncState('error');
+      if (!silent) toast('Sync impossible : ' + e.message);
+      setTimeout(() => setSyncState('idle'), 2500);
+      return false;
+    }
+  }
+
+  // Sync manuel via bouton ↻
+  syncBtn.addEventListener('click', async () => {
+    haptic(10);
+    const ok = await autoRefresh({ silent: false });
+    if (ok) render();
+    else if (!localStorage.getItem(STORAGE_KEYS.source)) {
+      toast('Configure ton URL ADE dans ⚙ Réglages');
+    }
+  });
+
+  // === Sélecteur de date natif (tap sur le titre) ===
+  titleBtn.addEventListener('click', () => {
+    datePicker.value = toISODate(CURSOR);
+    if (datePicker.showPicker) {
+      try { datePicker.showPicker(); return; } catch {}
+    }
+    datePicker.click();
+  });
+  datePicker.addEventListener('change', () => {
+    const d = parseISODate(datePicker.value);
+    if (d) { CURSOR = d; haptic(8); render(); }
+  });
+
+  // === Bouton "Copier" dans la modale détails ===
+  copyDetailsBtn.addEventListener('click', async () => {
+    if (!LAST_DETAILS_EV) return;
+    const ev = LAST_DETAILS_EV;
+    const fmtFull = (d) => d.toLocaleString('fr-FR', {
+      weekday: 'short', day: '2-digit', month: 'short',
+      hour: '2-digit', minute: '2-digit'
+    });
+    const lines = [
+      `${TYPE_LABEL[ev.type] || 'COURS'} · ${ev.title}`,
+      `${fmtFull(ev.start)} → ${fmtFull(ev.end)}`,
+      ev.room    ? `Salle : ${ev.room}`       : null,
+      ev.teacher ? `Enseignant : ${ev.teacher}` : null
+    ].filter(Boolean);
+    const txt = lines.join('\n');
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(txt);
+      else {
+        // Fallback iOS PWA standalone
+        const ta = document.createElement('textarea');
+        ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); ta.remove();
+      }
+      toast('Copié dans le presse-papier');
+    } catch {
+      toast('Copie impossible');
+    }
+  });
+
+  // === Pull-to-refresh ===
+  (() => {
+    let startY = null, dy = 0, pulling = false, ready = false;
+    const THRESHOLD = 70;
+    content.addEventListener('touchstart', (e) => {
+      if (window.scrollY > 0 || e.touches.length !== 1) { startY = null; return; }
+      startY = e.touches[0].clientY;
+      dy = 0; ready = false;
+    }, { passive: true });
+
+    content.addEventListener('touchmove', (e) => {
+      if (startY == null) return;
+      dy = e.touches[0].clientY - startY;
+      if (dy <= 0) { pullIndicator.classList.remove('pulling', 'ready'); pulling = false; return; }
+      if (!pulling) { pullIndicator.classList.add('pulling'); pulling = true; }
+      const reached = dy >= THRESHOLD;
+      if (reached !== ready) {
+        ready = reached;
+        pullIndicator.classList.toggle('ready', ready);
+        pullLabel.textContent = ready ? 'Relâcher pour rafraîchir' : 'Tirer pour rafraîchir';
+        if (ready) haptic(12);
+      }
+    }, { passive: true });
+
+    content.addEventListener('touchend', async () => {
+      if (startY == null) { return; }
+      const wasReady = ready;
+      startY = null; pulling = false; ready = false;
+      if (wasReady) {
+        pullIndicator.classList.add('loading');
+        pullLabel.textContent = 'Synchronisation…';
+        await autoRefresh({ silent: false });
+        render();
+        pullIndicator.classList.remove('loading');
+      }
+      pullIndicator.classList.remove('pulling', 'ready');
+    }, { passive: true });
+  })();
+
   // ---------- Démarrage ----------
   function bootstrap() {
     EVENTS = loadEvents();
@@ -737,6 +919,8 @@
     }
     render();
     updateStorageInfo();
+    // Auto-refresh silencieux au démarrage si une URL ADE est configurée
+    autoRefresh({ silent: true }).then(ok => { if (ok) render(); });
   }
 
   // Saute sur la date la plus pertinente parmi EVENTS :
