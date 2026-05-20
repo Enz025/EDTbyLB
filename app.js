@@ -266,6 +266,57 @@
     }
   }
 
+  // ============================================================
+  // CODE MODULE (R2.01, S1.04, M101, etc.) + couleur déterministe
+  // ============================================================
+  // Détecte des codes type ADE BUT/Licence en début de titre :
+  //   "R2.01 : Développement orienté objet" → "R2.01"
+  //   "S1.04 - Maths"                       → "S1.04"
+  //   "M101 Algorithmique"                  → "M101"
+  //   "UE5 Anglais"                         → "UE5"
+  function extractModuleCode(title) {
+    if (!title) return null;
+    const m = String(title).match(/^\s*([A-Z]{1,5}\d+(?:\.\d+)?)\b/i);
+    return m ? m[1].toUpperCase() : null;
+  }
+
+  // Palette de couleurs vibrantes iOS, suffisamment distinctes
+  const MODULE_PALETTE = [
+    '#FF2D55', // rose
+    '#FF3B30', // rouge
+    '#FF9500', // orange
+    '#FFCC00', // jaune
+    '#34C759', // vert
+    '#5AC8FA', // cyan
+    '#007AFF', // bleu
+    '#5856D6', // indigo
+    '#AF52DE', // violet
+    '#A2845E'  // brun
+  ];
+  function colorForModule(code) {
+    if (!code) return null;
+    let h = 0;
+    for (let i = 0; i < code.length; i++) {
+      h = ((h << 5) - h + code.charCodeAt(i)) | 0;
+    }
+    return MODULE_PALETTE[Math.abs(h) % MODULE_PALETTE.length];
+  }
+
+  // Résout la couleur ET le label badge :
+  //  - si type détecté CM/TD/TP/EX → couleur typée + label CM/TD/TP/EXAM
+  //  - sinon si code module trouvé → couleur unique par module + label "R2.01"
+  //  - sinon → gris neutre + label "COURS"
+  function resolveBadge(ev) {
+    if (ev.type && ev.type !== 'OTHER') {
+      return { color: typeColorVar(ev.type), label: TYPE_LABEL[ev.type] };
+    }
+    const code = extractModuleCode(ev.title);
+    if (code) {
+      return { color: colorForModule(code), label: code };
+    }
+    return { color: 'var(--other)', label: 'COURS' };
+  }
+
   // ---------- Sanitization ----------
   // Nettoie une chaîne avant affichage. textContent gère déjà l'échappement HTML,
   // mais on supprime les caractères de contrôle / null bytes par prudence.
@@ -550,7 +601,8 @@
     card.className = 'course';
     const state = liveStateFor(ev, now);
     if (!compact) card.classList.add(state);
-    card.style.setProperty('--type-color', typeColorVar(ev.type));
+    const { color: tcolor, label: tlabel } = resolveBadge(ev);
+    card.style.setProperty('--type-color', tcolor);
 
     const row1 = document.createElement('div');
     row1.className = 'row1';
@@ -559,12 +611,14 @@
 
     const badge = document.createElement('span');
     badge.className = 'badge';
-    badge.textContent = TYPE_LABEL[ev.type] || ev.type || 'COURS';
+    badge.textContent = tlabel;
     head.appendChild(badge);
 
+    // Titre nettoyé : enlève le code module et les ":" en début s'il est déjà dans le badge
+    const cleanTitle = ev.title.replace(/^\s*[A-Z]{1,5}\d+(?:\.\d+)?\s*[:\-–—]?\s*/i, '').trim() || ev.title;
     const title = document.createElement('h3');
     title.className = 'title';
-    title.textContent = ev.title;
+    title.textContent = cleanTitle;
     head.appendChild(title);
 
     if (!compact && state === 'live') {
@@ -755,12 +809,13 @@
         block.className = 'wt-block';
         block.style.top = top + 'px';
         block.style.height = height + 'px';
-        block.style.setProperty('--type-color', typeColorVar(ev.type));
+        const { color: bcolor, label: blabel } = resolveBadge(ev);
+        block.style.setProperty('--type-color', bcolor);
 
         const badge = document.createElement('span'); badge.className = 'wt-bbadge';
-        badge.textContent = TYPE_LABEL[ev.type] || 'COURS';
+        badge.textContent = blabel;
         const ttl = document.createElement('span'); ttl.className = 'wt-btitle';
-        ttl.textContent = ev.title;
+        ttl.textContent = ev.title.replace(/^\s*[A-Z]{1,5}\d+(?:\.\d+)?\s*[:\-–—]?\s*/i, '').trim() || ev.title;
         block.appendChild(badge);
         block.appendChild(ttl);
         if (ev.room && height >= 40) {
@@ -812,9 +867,10 @@
       weekday: 'short', day: '2-digit', month: 'short',
       hour: '2-digit', minute: '2-digit'
     });
-    detailsContent.style.setProperty('--type-color', typeColorVar(ev.type));
-    detailsBadge.textContent = TYPE_LABEL[ev.type] || ev.type || 'COURS';
-    detailsBadge.style.setProperty('--type-color', typeColorVar(ev.type));
+    const { color: dcolor, label: dlabel } = resolveBadge(ev);
+    detailsContent.style.setProperty('--type-color', dcolor);
+    detailsBadge.textContent = dlabel;
+    detailsBadge.style.setProperty('--type-color', dcolor);
     detailsTitle.textContent   = ev.title;
     detailsStart.textContent   = fmtFull(ev.start);
     detailsEnd.textContent     = fmtFull(ev.end);
@@ -885,6 +941,24 @@
   function haptic(ms) {
     if (navigator.vibrate) { try { navigator.vibrate(ms); } catch {} }
   }
+
+  // === Anti double-tap-zoom iOS (fallback JS) ===
+  // touch-action: manipulation suffit en théorie mais iOS triche parfois.
+  // On bloque le 2e tap rapide tant qu'il n'est pas sur un input texte.
+  (() => {
+    let lastTap = 0;
+    document.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      const target = e.target;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
+      if (!isInput && now - lastTap < 320) {
+        e.preventDefault();
+      }
+      lastTap = now;
+    }, { passive: false });
+    // Pincement à 2 doigts → bloque aussi
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+  })();
 
   // === Dialogue "Mes classes" ===
   function renderProfileList() {

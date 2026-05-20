@@ -534,22 +534,32 @@ input:focus, textarea:focus { border-color: var(--accent); }
   border-radius: var(--radius-md);
   background:
     linear-gradient(135deg,
-      color-mix(in srgb, var(--type-color, var(--other)) 14%, transparent),
-      color-mix(in srgb, var(--type-color, var(--other)) 0%, transparent) 70%),
+      color-mix(in srgb, var(--type-color, var(--other)) 16%, transparent),
+      color-mix(in srgb, var(--type-color, var(--other)) 2%, transparent) 75%),
     var(--card-strong);
-  border: 1px solid color-mix(in srgb, var(--type-color, var(--other)) 22%, var(--border));
-  box-shadow: var(--shadow);
+  border: 1px solid color-mix(in srgb, var(--type-color, var(--other)) 25%, var(--border));
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--type-color, var(--other)) 8%, transparent),
+    0 4px 16px color-mix(in srgb, var(--type-color, var(--other)) 10%, transparent),
+    var(--shadow);
   overflow: hidden;
   cursor: pointer;
-  transition: transform .12s ease, box-shadow .12s ease;
+  transition: transform .15s cubic-bezier(.2,.8,.2,1), box-shadow .15s ease;
+  animation: card-in .25s cubic-bezier(.2,.8,.2,1) both;
 }
-.course:active { transform: scale(0.985); }
+.course:active { transform: scale(0.98); }
 .course::before {
   content: "";
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  width: 6px;
-  background: var(--type-color, var(--other));
+  width: 5px;
+  background: linear-gradient(180deg,
+    var(--type-color, var(--other)),
+    color-mix(in srgb, var(--type-color, var(--other)) 70%, transparent));
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .course .row1 {
   display: flex;
