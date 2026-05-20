@@ -101,15 +101,27 @@
   }
 
   // ---------- Détection du type de cours ----------
-  // Normalise les séparateurs ADE (_ - . :) en espaces pour que \b fonctionne
-  // sur "INFO101_TP_Prog" → "INFO101 TP Prog".
-  function detectType(rawTitle) {
-    const norm = String(rawTitle || '').replace(/[_\-.:|/]/g, ' ').toUpperCase();
-    if (/\b(EXAM|EXAMEN|PARTIEL|DS|DSC|RATTRAPAGE|CC|CONTROLE)\b/.test(norm)) return 'EX';
-    if (/\bTP\b/.test(norm)) return 'TP';
-    if (/\bTD\b/.test(norm)) return 'TD';
-    if (/\b(CM|MAGISTRAL|MAGISTRALE|COURS)\b/.test(norm)) return 'CM';
+  // Normalise les séparateurs ADE (_ - . :) + accents en espaces pour que \b fonctionne.
+  function normalizeForType(s) {
+    return String(s || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // accents
+      .replace(/[_\-.:|/]/g, ' ')
+      .toUpperCase();
+  }
+  function detectType(rawText) {
+    const norm = normalizeForType(rawText);
+    if (/\b(EXAM|EXAMEN|PARTIEL|RATTRAPAGE|CONTROLE|EVALUATION|DS|DSC|CC)\b/.test(norm)) return 'EX';
+    if (/\b(TP|TRAVAUX\s+PRATIQUES?)\b/.test(norm))                                       return 'TP';
+    if (/\b(TD|TRAVAUX\s+DIRIGES?)\b/.test(norm))                                         return 'TD';
+    if (/\b(CM|COURS\s+MAGISTRAL|MAGISTRAL|AMPHI)\b/.test(norm))                          return 'CM';
     return 'OTHER';
+  }
+  // Détection multi-champs : tente SUMMARY puis DESCRIPTION puis CATEGORIES
+  function detectTypeMulti(title, description, categories) {
+    let t = detectType(title);
+    if (t === 'OTHER') t = detectType(description);
+    if (t === 'OTHER') t = detectType(categories);
+    return t;
   }
   const TYPE_LABEL = { CM: 'CM', TD: 'TD', TP: 'TP', EX: 'EXAM', OTHER: 'COURS' };
   function typeColorVar(type) {
@@ -186,15 +198,17 @@
           const start = parseIcsDate(cur.DTSTART.value, cur.DTSTART.params);
           const end   = parseIcsDate(cur.DTEND.value,   cur.DTEND.params);
           if (start && end) {
-            const title = unescapeIcs(cur.SUMMARY?.value || 'Sans titre');
+            const title       = unescapeIcs(cur.SUMMARY?.value || 'Sans titre');
+            const description = unescapeIcs(cur.DESCRIPTION?.value || '');
+            const categories  = unescapeIcs(cur.CATEGORIES?.value || '');
             events.push({
               id: clean(cur.UID?.value || `${start.getTime()}-${Math.random()}`, 200),
               title: clean(title, 200),
-              type: detectType(title),
+              type: detectTypeMulti(title, description, categories),
               start, end,
               room:        clean(unescapeIcs(cur.LOCATION?.value || ''), 200),
-              teacher:     extractTeacher(unescapeIcs(cur.DESCRIPTION?.value || '')),
-              description: clean(unescapeIcs(cur.DESCRIPTION?.value || ''), 1000)
+              teacher:     extractTeacher(description),
+              description: clean(description, 1000)
             });
           }
         }
