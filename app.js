@@ -479,8 +479,26 @@
     fetchIcsBtn.disabled = true;
     try {
       const fetchUrl = resolveFetchUrl(url);
-      const res = await fetch(fetchUrl, { credentials: 'omit', redirect: 'follow' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const usedProxy = fetchUrl.startsWith('./proxy.php');
+      let res;
+      try {
+        res = await fetch(fetchUrl, { credentials: 'omit', redirect: 'follow' });
+      } catch (netErr) {
+        if (usedProxy) {
+          throw new Error("Proxy indisponible : utilise plutôt « Importer fichier .ics ».");
+        }
+        throw netErr;
+      }
+      if (!res.ok) {
+        if (usedProxy && (res.status === 404 || res.status === 405)) {
+          throw new Error("proxy.php absent (hébergement statique) : utilise « Importer fichier .ics ».");
+        }
+        throw new Error('HTTP ' + res.status);
+      }
+      const ctype = (res.headers.get('content-type') || '').toLowerCase();
+      if (usedProxy && ctype.includes('text/html')) {
+        throw new Error("Réponse HTML inattendue : l'hébergement ne supporte pas PHP.");
+      }
       const text = await res.text();
       const evs = parseICS(text);
       if (!evs.length) throw new Error('Aucun événement trouvé.');
