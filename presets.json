@@ -1,5 +1,11 @@
 {
-  "_comment": "Classes Artois préconfigurées. Pour ajouter ta classe : ouvre la PWA → ⚙ Réglages → ajoute ton URL ADE → puis copie le JSON généré ici sous 'classes'.",
+  "_comment": "Classes Artois préconfigurées. Pour ajouter ta classe : envoie ton URL ADE à Enzo.",
   "campus": "Université d'Artois",
-  "classes": []
+  "classes": [
+    {
+      "name": "BUT INFO 1A — Groupe C1 (Lens)",
+      "url": "https://ade-consult.univ-artois.fr/jsp/custom/modules/plannings/rY64beWz.shu",
+      "tag": "Lens"
+    }
+  ]
 }

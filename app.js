@@ -239,6 +239,10 @@
     const norm = normalizeForType(rawText);
     // EXAMENS
     if (/\b(EXAM|EXAMEN|PARTIEL|RATTRAPAGE|CONTROLE|EVALUATION|DS|DSC|CC|SOUTENANCE)\b/.test(norm)) return 'EX';
+    // ADE Artois : type collé au code de groupe (B1INFOS1TPB1, B1INFOS2CM, B1INFOS1TDA...)
+    // S\d+ = marqueur de semestre, suivi directement par TP/TD/CM
+    const ade = /S\d+(TP|TD|CM)/.exec(norm);
+    if (ade) return ade[1];
     // TP — formes longues, abrégées, suffixées (TP1, TP-A, TPA, TP_B...)
     if (/(?:^|[^A-Z])(TP|TRAVAUX\s+PRATIQUES?)(?:[\d\s\-_:.,]|$)/.test(norm)) return 'TP';
     if (/\b(GR(?:OUPE)?[\s_\-.]*TP)/.test(norm))                              return 'TP';
@@ -329,19 +333,26 @@
     return MODULE_COLOR.get(code) || 'var(--other)';
   }
 
-  // Résout la couleur ET le label badge :
-  //  - si type détecté CM/TD/TP/EX → couleur typée + label CM/TD/TP/EXAM
-  //  - sinon si code module trouvé → couleur unique par module + label "R2.01"
-  //  - sinon → gris neutre + label "COURS"
+  // Résout couleur + badges :
+  //  - Couleur prioritaire : par MODULE (différencier les matières visuellement)
+  //  - Badge principal     : code module (R1.12) si présent, sinon type, sinon "COURS"
+  //  - Badge secondaire    : type (CM/TD/TP/EXAM) si détecté ET différent du principal
   function resolveBadge(ev) {
-    if (ev.type && ev.type !== 'OTHER') {
-      return { color: typeColorVar(ev.type), label: TYPE_LABEL[ev.type] };
-    }
     const code = extractModuleCode(ev.title);
+    const hasType = ev.type && ev.type !== 'OTHER';
+    let color, label, secondary = null;
     if (code) {
-      return { color: colorForModule(code), label: code };
+      color = colorForModule(code);
+      label = code;
+      if (hasType) secondary = TYPE_LABEL[ev.type];
+    } else if (hasType) {
+      color = typeColorVar(ev.type);
+      label = TYPE_LABEL[ev.type];
+    } else {
+      color = 'var(--other)';
+      label = 'COURS';
     }
-    return { color: 'var(--other)', label: 'COURS' };
+    return { color, label, secondary };
   }
 
   // ---------- Sanitization ----------
@@ -628,7 +639,7 @@
     card.className = 'course';
     const state = liveStateFor(ev, now);
     if (!compact) card.classList.add(state);
-    const { color: tcolor, label: tlabel } = resolveBadge(ev);
+    const { color: tcolor, label: tlabel, secondary: tsec } = resolveBadge(ev);
     card.style.setProperty('--type-color', tcolor);
 
     const row1 = document.createElement('div');
@@ -640,6 +651,13 @@
     badge.className = 'badge';
     badge.textContent = tlabel;
     head.appendChild(badge);
+
+    if (tsec) {
+      const sub = document.createElement('span');
+      sub.className = 'badge-sub';
+      sub.textContent = tsec;
+      head.appendChild(sub);
+    }
 
     // Titre nettoyé : enlève le code module et les ":" en début s'il est déjà dans le badge
     const cleanTitle = ev.title.replace(/^\s*[A-Z]{1,5}\d+(?:\.\d+)?\s*[:\-–—]?\s*/i, '').trim() || ev.title;
@@ -836,11 +854,11 @@
         block.className = 'wt-block';
         block.style.top = top + 'px';
         block.style.height = height + 'px';
-        const { color: bcolor, label: blabel } = resolveBadge(ev);
+        const { color: bcolor, label: blabel, secondary: bsec } = resolveBadge(ev);
         block.style.setProperty('--type-color', bcolor);
 
         const badge = document.createElement('span'); badge.className = 'wt-bbadge';
-        badge.textContent = blabel;
+        badge.textContent = bsec ? `${blabel} · ${bsec}` : blabel;
         const ttl = document.createElement('span'); ttl.className = 'wt-btitle';
         ttl.textContent = ev.title.replace(/^\s*[A-Z]{1,5}\d+(?:\.\d+)?\s*[:\-–—]?\s*/i, '').trim() || ev.title;
         block.appendChild(badge);
@@ -894,9 +912,9 @@
       weekday: 'short', day: '2-digit', month: 'short',
       hour: '2-digit', minute: '2-digit'
     });
-    const { color: dcolor, label: dlabel } = resolveBadge(ev);
+    const { color: dcolor, label: dlabel, secondary: dsec } = resolveBadge(ev);
     detailsContent.style.setProperty('--type-color', dcolor);
-    detailsBadge.textContent = dlabel;
+    detailsBadge.textContent = dsec ? `${dlabel} · ${dsec}` : dlabel;
     detailsBadge.style.setProperty('--type-color', dcolor);
     detailsTitle.textContent   = ev.title;
     detailsStart.textContent   = fmtFull(ev.start);
