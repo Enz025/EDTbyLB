@@ -469,6 +469,24 @@
       const title = isWeekend ? 'Week-end' : (isToday ? 'Journée libre' : 'Pas de cours');
       const sub   = isWeekend ? 'Profite bien !' : (isToday ? "Rien au programme aujourd'hui." : 'Aucun cours prévu ce jour.');
       content.appendChild(buildEmpty(title, sub));
+
+      // Si on a quand même un EDT chargé, propose un raccourci vers le prochain cours
+      if (EVENTS.length) {
+        const upcoming = [...EVENTS].sort((a, b) => a.start - b.start).find(ev => ev.start >= now);
+        const target = upcoming || [...EVENTS].sort((a, b) => b.start - a.start)[0];
+        if (target && !sameDay(target.start, CURSOR)) {
+          const btn = document.createElement('button');
+          btn.className = 'btn primary';
+          btn.style.alignSelf = 'center';
+          btn.textContent = upcoming
+            ? `→ Aller au prochain cours (${target.start.toLocaleDateString('fr-FR', {weekday:'short', day:'2-digit', month:'short'})})`
+            : `→ Voir le dernier cours (${target.start.toLocaleDateString('fr-FR', {weekday:'short', day:'2-digit', month:'short'})})`;
+          btn.addEventListener('click', () => {
+            CURSOR = new Date(target.start); CURSOR.setHours(0,0,0,0); render();
+          });
+          content.appendChild(btn);
+        }
+      }
       return;
     }
 
@@ -642,7 +660,8 @@
       EVENTS = evs;
       persistEvents();
       localStorage.setItem(STORAGE_KEYS.source, JSON.stringify({ type: 'ics', url, importedAt: Date.now() }));
-      toast(`${evs.length} cours importé(s)`);
+      jumpToMostRelevantDate();
+      toast(`${evs.length} cours · ${importRangeLabel()}`, 4500);
       render();
     } catch (e) {
       toast('Import impossible : ' + e.message);
@@ -661,7 +680,8 @@
       EVENTS = evs;
       persistEvents();
       localStorage.setItem(STORAGE_KEYS.source, JSON.stringify({ type: 'ics', importedAt: Date.now() }));
-      toast(`${evs.length} cours importé(s)`);
+      jumpToMostRelevantDate();
+      toast(`${evs.length} cours · ${importRangeLabel()}`, 4500);
       render();
     } catch (e) {
       toast('Fichier invalide : ' + e.message);
@@ -679,7 +699,8 @@
       EVENTS = evs;
       persistEvents();
       localStorage.setItem(STORAGE_KEYS.source, JSON.stringify({ type: 'json', importedAt: Date.now() }));
-      toast(`${evs.length} cours chargé(s)`);
+      jumpToMostRelevantDate();
+      toast(`${evs.length} cours · ${importRangeLabel()}`, 4500);
       render();
     } catch (e) { toast(e.message); }
   });
@@ -702,6 +723,32 @@
     }
     render();
     updateStorageInfo();
+  }
+
+  // Saute sur la date la plus pertinente parmi EVENTS :
+  // - aujourd'hui si y a des cours
+  // - sinon le prochain cours à venir
+  // - sinon le dernier cours passé
+  function jumpToMostRelevantDate() {
+    if (!EVENTS.length) return;
+    const now = new Date();
+    const sorted = [...EVENTS].sort((a, b) => a.start - b.start);
+    if (sorted.some(ev => sameDay(ev.start, now))) {
+      CURSOR = new Date(now);
+    } else {
+      const upcoming = sorted.find(ev => ev.start >= now);
+      CURSOR = new Date((upcoming || sorted[sorted.length - 1]).start);
+    }
+    CURSOR.setHours(0, 0, 0, 0);
+  }
+
+  function importRangeLabel() {
+    if (!EVENTS.length) return '';
+    const sorted = [...EVENTS].sort((a, b) => a.start - b.start);
+    const a = sorted[0].start;
+    const b = sorted[sorted.length - 1].end;
+    const fmt = (d) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    return `${fmt(a)} → ${fmt(b)}`;
   }
 
   function demoEvents() {
