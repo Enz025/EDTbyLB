@@ -280,26 +280,36 @@
     return m ? m[1].toUpperCase() : null;
   }
 
-  // Palette de couleurs vibrantes iOS, suffisamment distinctes
+  // Palette de couleurs vibrantes iOS (16 teintes bien distinctes)
   const MODULE_PALETTE = [
     '#FF2D55', // rose
     '#FF3B30', // rouge
+    '#FF6B22', // orange foncé
     '#FF9500', // orange
     '#FFCC00', // jaune
+    '#9DC83C', // citron
     '#34C759', // vert
+    '#00C7BE', // mint
+    '#30B0C7', // teal
     '#5AC8FA', // cyan
     '#007AFF', // bleu
     '#5856D6', // indigo
     '#AF52DE', // violet
-    '#A2845E'  // brun
+    '#BF5AF2', // mauve
+    '#A2845E', // brun
+    '#9C7B58'  // beige
   ];
+  // FNV-1a 32-bit sur la chaîne INVERSÉE → donne du poids au suffixe variable
+  // (R2.01, R2.02, R2.10, R2.11 doivent donner 4 couleurs très différentes,
+  //  pas dominées par le préfixe commun "R2.")
   function colorForModule(code) {
     if (!code) return null;
-    let h = 0;
-    for (let i = 0; i < code.length; i++) {
-      h = ((h << 5) - h + code.charCodeAt(i)) | 0;
+    let h = 0x811c9dc5;
+    for (let i = code.length - 1; i >= 0; i--) {
+      h ^= code.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
     }
-    return MODULE_PALETTE[Math.abs(h) % MODULE_PALETTE.length];
+    return MODULE_PALETTE[(h >>> 0) % MODULE_PALETTE.length];
   }
 
   // Résout la couleur ET le label badge :
