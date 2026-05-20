@@ -1,0 +1,5 @@
+{
+  "_comment": "Classes Artois préconfigurées. Pour ajouter ta classe : ouvre la PWA → ⚙ Réglages → ajoute ton URL ADE → puis copie le JSON généré ici sous 'classes'.",
+  "campus": "Université d'Artois",
+  "classes": []
+}

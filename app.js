@@ -76,8 +76,11 @@
   const newProfileName = $('#newProfileName');
   const newProfileUrl  = $('#newProfileUrl');
   const addProfileBtn  = $('#addProfileBtn');
+  const presetsSection = $('#presetsSection');
+  const presetsList    = $('#presetsList');
 
   let LAST_DETAILS_EV = null;
+  let PRESETS = []; // [{name, url, tag?}]
 
   // ---------- Utilitaires ----------
   function toast(msg, ms = 2200) {
@@ -931,9 +934,56 @@
     }
   }
 
+  // === Chargement des classes préconfigurées (presets.json) ===
+  async function loadPresets() {
+    try {
+      const res = await fetch('./presets.json', { cache: 'no-cache' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && Array.isArray(data.classes)) {
+        PRESETS = data.classes.filter(c => c && c.name && c.url);
+      }
+    } catch {/* silencieux : pas de presets, pas grave */}
+  }
+  function renderPresetsList() {
+    clearNode(presetsList);
+    const existingUrls = new Set(loadProfilesRaw().map(p => p.url).filter(Boolean));
+    const filtered = PRESETS.filter(p => !existingUrls.has(p.url));
+    if (!filtered.length) { presetsSection.hidden = true; return; }
+    presetsSection.hidden = false;
+    for (const preset of filtered) {
+      const li = document.createElement('li');
+      li.className = 'preset-row';
+      const name = document.createElement('span'); name.className = 'pname'; name.textContent = preset.name;
+      li.appendChild(name);
+      if (preset.tag) {
+        const tag = document.createElement('span'); tag.className = 'ptag'; tag.textContent = preset.tag;
+        li.appendChild(tag);
+      }
+      li.addEventListener('click', async () => {
+        haptic(10);
+        // Sécurise et valide l'URL avant de créer le profil
+        let safeUrl;
+        try { safeUrl = safeIcsUrl(preset.url); }
+        catch (e) { toast('URL invalide : ' + e.message); return; }
+        const p = addProfile({ name: preset.name, type: 'ics', url: safeUrl });
+        EVENTS = [];
+        refreshProfileChip();
+        render();
+        renderProfileList();
+        renderPresetsList();
+        toast(`Classe « ${p.name} » ajoutée`);
+        const ok = await autoRefresh({ silent: false });
+        if (ok) { jumpToMostRelevantDate(); render(); renderProfileList(); }
+      });
+      presetsList.appendChild(li);
+    }
+  }
+
   profileBtn.addEventListener('click', () => {
     haptic(8);
     renderProfileList();
+    renderPresetsList();
     addProfileDetails.open = false;
     newProfileName.value = '';
     newProfileUrl.value = '';
@@ -1241,9 +1291,38 @@
     }, { passive: true });
   })();
 
+  // === Lien magique : ?addUrl=...&name=... pour pré-configurer une classe ===
+  // Utile pour partager : "Voici mon EDT déjà prêt, clique sur ce lien"
+  function handleMagicLink() {
+    const params = new URLSearchParams(location.search);
+    const addUrl = params.get('addUrl');
+    const name = params.get('name') || 'Classe partagée';
+    if (!addUrl) return false;
+    try {
+      const safe = safeIcsUrl(addUrl);
+      // évite les doublons
+      const existing = loadProfilesRaw().find(p => p.url === safe);
+      if (existing) {
+        setActiveProfileId(existing.id);
+        toast(`Classe « ${existing.name} » activée`);
+      } else {
+        const p = addProfile({ name: clean(name, 40), type: 'ics', url: safe });
+        toast(`Classe « ${p.name} » ajoutée`);
+      }
+      // Nettoie l'URL pour ne pas re-déclencher au refresh
+      history.replaceState(null, '', location.pathname);
+      return true;
+    } catch (e) {
+      toast('Lien invalide : ' + e.message);
+      return false;
+    }
+  }
+
   // ---------- Démarrage ----------
-  function bootstrap() {
+  async function bootstrap() {
     migrateLegacyIfNeeded();
+    handleMagicLink();
+    await loadPresets();
     EVENTS = loadEvents();
     if (!EVENTS.length && !getActiveProfile()) {
       // Démo : journée type si l'utilisateur n'a encore rien importé/configuré
