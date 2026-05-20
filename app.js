@@ -43,6 +43,16 @@
   const clearBtn   = $('#clearBtn');
   const storageInfo= $('#storageInfo');
   const toastEl    = $('#toast');
+  const detailsDlg = $('#detailsDlg');
+  const detailsBadge   = $('#detailsBadge');
+  const detailsTitle   = $('#detailsTitle');
+  const detailsStart   = $('#detailsStart');
+  const detailsEnd     = $('#detailsEnd');
+  const detailsRoom    = $('#detailsRoom');
+  const detailsTeacher = $('#detailsTeacher');
+  const detailsDescWrap= $('#detailsDescWrap');
+  const detailsDesc    = $('#detailsDesc');
+  const detailsContent = $('#detailsContent');
 
   // ---------- Utilitaires ----------
   function toast(msg, ms = 2200) {
@@ -91,14 +101,17 @@
   }
 
   // ---------- Détection du type de cours ----------
+  // Normalise les séparateurs ADE (_ - . :) en espaces pour que \b fonctionne
+  // sur "INFO101_TP_Prog" → "INFO101 TP Prog".
   function detectType(rawTitle) {
-    const t = String(rawTitle || '').toUpperCase();
-    if (/\bEXAM|PARTIEL|DS\b/.test(t)) return 'EX';
-    if (/\bTP\b/.test(t)) return 'TP';
-    if (/\bTD\b/.test(t)) return 'TD';
-    if (/\bCM\b|MAGISTRAL/.test(t)) return 'CM';
+    const norm = String(rawTitle || '').replace(/[_\-.:|/]/g, ' ').toUpperCase();
+    if (/\b(EXAM|EXAMEN|PARTIEL|DS|DSC|RATTRAPAGE|CC|CONTROLE)\b/.test(norm)) return 'EX';
+    if (/\bTP\b/.test(norm)) return 'TP';
+    if (/\bTD\b/.test(norm)) return 'TD';
+    if (/\b(CM|MAGISTRAL|MAGISTRALE|COURS)\b/.test(norm)) return 'CM';
     return 'OTHER';
   }
+  const TYPE_LABEL = { CM: 'CM', TD: 'TD', TP: 'TP', EX: 'EXAM', OTHER: 'COURS' };
   function typeColorVar(type) {
     switch (type) {
       case 'CM': return 'var(--cm)';
@@ -328,34 +341,103 @@
       .sort((a, b) => a.start - b.start);
   }
 
-  function buildCourseCard(ev, compact = false) {
+  // État live d'un cours par rapport à "maintenant"
+  function liveStateFor(ev, now = new Date()) {
+    if (now >= ev.start && now < ev.end) return 'live';
+    if (now < ev.start) return 'future';
+    return 'past';
+  }
+
+  // Stats journalières
+  function dayStats(list) {
+    let totalMs = 0;
+    for (const ev of list) totalMs += Math.max(0, ev.end - ev.start);
+    const h = Math.floor(totalMs / 3600000);
+    const m = Math.round((totalMs % 3600000) / 60000);
+    return { count: list.length, hours: h, minutes: m };
+  }
+  function fmtDuration(ms) {
+    const totalMin = Math.round(ms / 60000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h <= 0) return `${m} min`;
+    if (m <= 0) return `${h}h`;
+    return `${h}h${String(m).padStart(2, '0')}`;
+  }
+
+  function buildSummaryCard(list) {
+    const s = dayStats(list);
+    const wrap = document.createElement('div');
+    wrap.className = 'day-summary glass';
+    const mk = (val, label) => {
+      const st = document.createElement('div'); st.className = 'stat';
+      const b  = document.createElement('strong'); b.textContent = val;
+      const sp = document.createElement('span'); sp.textContent = label;
+      st.appendChild(b); st.appendChild(sp); return st;
+    };
+    wrap.appendChild(mk(String(s.count), s.count > 1 ? 'cours' : 'cours'));
+    const dur = s.minutes ? `${s.hours}h${String(s.minutes).padStart(2,'0')}` : `${s.hours}h`;
+    wrap.appendChild(mk(dur, 'de cours'));
+    return wrap;
+  }
+
+  function buildNextCourseCard(ev, now = new Date()) {
+    const diffMs = ev.start - now;
+    const wrap = document.createElement('div');
+    wrap.className = 'next-course';
+    const arrow = document.createElement('span'); arrow.className = 'arrow'; arrow.textContent = '→';
+    const txt = document.createElement('span');
+    const strong = document.createElement('strong'); strong.textContent = 'Prochain : ';
+    txt.appendChild(strong);
+    txt.appendChild(document.createTextNode(`${ev.title} dans ${fmtDuration(diffMs)}`));
+    if (ev.room) txt.appendChild(document.createTextNode(` · ${ev.room}`));
+    wrap.appendChild(arrow); wrap.appendChild(txt);
+    return wrap;
+  }
+
+  function buildPauseCard(ms) {
+    const el = document.createElement('div');
+    el.className = 'pause';
+    const txt = document.createElement('span');
+    txt.textContent = `Pause · ${fmtDuration(ms)}`;
+    el.appendChild(txt);
+    return el;
+  }
+
+  function buildCourseCard(ev, compact = false, now = new Date()) {
     const card = document.createElement('article');
     card.className = 'course';
+    const state = liveStateFor(ev, now);
+    if (!compact) card.classList.add(state);
     card.style.setProperty('--type-color', typeColorVar(ev.type));
 
     const row1 = document.createElement('div');
     row1.className = 'row1';
 
-    const titleWrap = document.createElement('div');
+    const head = document.createElement('div'); head.className = 'head';
+
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.textContent = TYPE_LABEL[ev.type] || ev.type || 'COURS';
+    head.appendChild(badge);
+
     const title = document.createElement('h3');
     title.className = 'title';
-    title.textContent = ev.title; // sécurisé
-    titleWrap.appendChild(title);
+    title.textContent = ev.title;
+    head.appendChild(title);
 
-    if (!compact && ev.type) {
-      const badge = document.createElement('span');
-      badge.className = 'badge';
-      badge.style.setProperty('--type-color', typeColorVar(ev.type));
-      badge.textContent = ev.type;
-      titleWrap.appendChild(document.createTextNode(' '));
-      titleWrap.appendChild(badge);
+    if (!compact && state === 'live') {
+      const live = document.createElement('span');
+      live.className = 'live-badge';
+      live.textContent = 'EN COURS';
+      head.appendChild(live);
     }
 
     const time = document.createElement('span');
     time.className = 'time';
-    time.textContent = `${fmtTime(ev.start)} – ${fmtTime(ev.end)}`;
+    time.textContent = `${fmtTime(ev.start)}–${fmtTime(ev.end)}`;
 
-    row1.appendChild(titleWrap);
+    row1.appendChild(head);
     row1.appendChild(time);
     card.appendChild(row1);
 
@@ -365,6 +447,13 @@
       if (ev.room)    { const s = document.createElement('span'); s.textContent = '📍 ' + ev.room;    meta.appendChild(s); }
       if (ev.teacher) { const s = document.createElement('span'); s.textContent = '👤 ' + ev.teacher; meta.appendChild(s); }
       if (meta.children.length) card.appendChild(meta);
+
+      card.addEventListener('click', () => openDetails(ev));
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetails(ev); }
+      });
     }
     return card;
   }
@@ -372,11 +461,36 @@
   function renderDay() {
     clearNode(content);
     const list = eventsForDay(CURSOR);
+    const now = new Date();
+    const isToday = sameDay(CURSOR, now);
+    const isWeekend = CURSOR.getDay() === 0 || CURSOR.getDay() === 6;
+
     if (!list.length) {
-      content.appendChild(buildEmpty('Pas de cours', 'Profite bien de ta journée libre.'));
+      const title = isWeekend ? 'Week-end' : (isToday ? 'Journée libre' : 'Pas de cours');
+      const sub   = isWeekend ? 'Profite bien !' : (isToday ? "Rien au programme aujourd'hui." : 'Aucun cours prévu ce jour.');
+      content.appendChild(buildEmpty(title, sub));
       return;
     }
-    for (const ev of list) content.appendChild(buildCourseCard(ev));
+
+    // Résumé du jour
+    content.appendChild(buildSummaryCard(list));
+
+    // Prochain cours (si aujourd'hui et qu'il y en a un à venir)
+    if (isToday) {
+      const next = list.find(ev => ev.start > now);
+      if (next) content.appendChild(buildNextCourseCard(next, now));
+    }
+
+    // Cours + pauses ≥ 30 min
+    const PAUSE_THRESHOLD = 30 * 60 * 1000;
+    for (let i = 0; i < list.length; i++) {
+      const ev = list[i];
+      content.appendChild(buildCourseCard(ev, false, now));
+      if (i < list.length - 1) {
+        const gap = list[i + 1].start - ev.end;
+        if (gap >= PAUSE_THRESHOLD) content.appendChild(buildPauseCard(gap));
+      }
+    }
   }
 
   function renderWeek() {
@@ -412,6 +526,29 @@
     const s = document.createElement('span');   s.textContent = sub;
     wrap.appendChild(t); wrap.appendChild(s);
     return wrap;
+  }
+
+  function openDetails(ev) {
+    const fmtFull = (d) => d.toLocaleString('fr-FR', {
+      weekday: 'short', day: '2-digit', month: 'short',
+      hour: '2-digit', minute: '2-digit'
+    });
+    detailsContent.style.setProperty('--type-color', typeColorVar(ev.type));
+    detailsBadge.textContent = TYPE_LABEL[ev.type] || ev.type || 'COURS';
+    detailsBadge.style.setProperty('--type-color', typeColorVar(ev.type));
+    detailsTitle.textContent   = ev.title;
+    detailsStart.textContent   = fmtFull(ev.start);
+    detailsEnd.textContent     = fmtFull(ev.end);
+    detailsRoom.textContent    = ev.room    || '—';
+    detailsTeacher.textContent = ev.teacher || '—';
+    if (ev.description && ev.description.trim()) {
+      detailsDesc.textContent = ev.description;
+      detailsDescWrap.hidden = false;
+    } else {
+      detailsDescWrap.hidden = true;
+    }
+    if (typeof detailsDlg.showModal === 'function') detailsDlg.showModal();
+    else detailsDlg.setAttribute('open', '');
   }
 
   function render() {
@@ -588,4 +725,13 @@
   }
 
   bootstrap();
+
+  // Refresh des indicateurs "EN COURS" / "dans X min" toutes les minutes,
+  // uniquement quand on affiche le jour courant en vue Jour.
+  setInterval(() => {
+    if (VIEW === 'day' && sameDay(CURSOR, new Date())) render();
+  }, 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && VIEW === 'day' && sameDay(CURSOR, new Date())) render();
+  });
 })();

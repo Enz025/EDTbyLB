@@ -101,6 +101,26 @@
       </form>
     </dialog>
 
+    <dialog id="detailsDlg" class="details-dlg">
+      <form method="dialog" class="details-content glass" id="detailsContent">
+        <span id="detailsBadge" class="badge" style="align-self:flex-start"></span>
+        <h2 id="detailsTitle">—</h2>
+        <div class="kv-grid">
+          <div class="kv"><span class="k">Début</span><span class="v" id="detailsStart">—</span></div>
+          <div class="kv"><span class="k">Fin</span><span class="v" id="detailsEnd">—</span></div>
+          <div class="kv"><span class="k">Salle</span><span class="v" id="detailsRoom">—</span></div>
+          <div class="kv"><span class="k">Enseignant</span><span class="v" id="detailsTeacher">—</span></div>
+        </div>
+        <div class="kv" id="detailsDescWrap" hidden>
+          <span class="k">Description</span>
+          <div class="desc" id="detailsDesc"></div>
+        </div>
+        <div class="row right">
+          <button type="submit" class="btn primary">Fermer</button>
+        </div>
+      </form>
+    </dialog>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>
 

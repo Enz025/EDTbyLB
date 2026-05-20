@@ -21,12 +21,12 @@
   --radius-sm: 12px;
   --blur: saturate(180%) blur(22px);
 
-  /* Couleurs par type de cours */
-  --cm: #a5b4fc;  /* indigo pastel */
-  --td: #86efac;  /* vert pastel */
-  --tp: #fdba74;  /* orange pastel */
-  --ex: #fca5a5;  /* rose / exam */
-  --other: #d8b4fe;
+  /* Couleurs par type de cours — palette iOS system */
+  --cm: #007AFF;    /* bleu Apple — cours magistral */
+  --td: #34C759;    /* vert Apple — travaux dirigés */
+  --tp: #FF9500;    /* orange Apple — travaux pratiques */
+  --ex: #FF3B30;    /* rouge Apple — examens */
+  --other: #AF52DE; /* violet Apple — autres */
 
   /* Safe areas iOS */
   --safe-top: env(safe-area-inset-top, 0px);
@@ -50,11 +50,12 @@
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
     --accent: #0a84ff;
 
-    --cm: #6366f1;
-    --td: #22c55e;
-    --tp: #f97316;
-    --ex: #ef4444;
-    --other: #a855f7;
+    /* Variantes "Bright" iOS pour le dark mode */
+    --cm: #0A84FF;
+    --td: #30D158;
+    --tp: #FF9F0A;
+    --ex: #FF453A;
+    --other: #BF5AF2;
   }
 }
 
@@ -191,57 +192,185 @@ input:focus, textarea:focus { border-color: var(--accent); }
 /* === Carte cours === */
 .course {
   position: relative;
-  padding: 14px 16px 14px 18px;
+  padding: 14px 16px 14px 22px;
   border-radius: var(--radius-md);
-  background: var(--card-strong);
-  border: 1px solid var(--border);
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--type-color, var(--other)) 14%, transparent),
+      color-mix(in srgb, var(--type-color, var(--other)) 0%, transparent) 70%),
+    var(--card-strong);
+  border: 1px solid color-mix(in srgb, var(--type-color, var(--other)) 22%, var(--border));
   box-shadow: var(--shadow);
   overflow: hidden;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease;
 }
+.course:active { transform: scale(0.985); }
 .course::before {
   content: "";
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  width: 5px;
+  width: 6px;
   background: var(--type-color, var(--other));
 }
 .course .row1 {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
+}
+.course .head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 .course .title {
   margin: 0;
   font-size: 16px;
   font-weight: 650;
   letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .course .time {
   font-variant-numeric: tabular-nums;
   font-size: 13px;
   color: var(--fg-soft);
   white-space: nowrap;
+  font-weight: 600;
 }
 .course .meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-top: 6px;
+  gap: 4px 12px;
+  margin-top: 8px;
   font-size: 13px;
-  color: var(--muted);
+  color: var(--fg-soft);
 }
-.course .badge {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--type-color) 25%, transparent);
-  color: var(--type-color);
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: var(--type-color, var(--other));
+  color: white;
   text-transform: uppercase;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--type-color, var(--other)) 35%, transparent);
 }
+
+/* === Cours EN COURS === */
+.course.live {
+  border-color: var(--type-color, var(--other));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--type-color, var(--other)) 25%, transparent),
+    var(--shadow);
+}
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--type-color, var(--other));
+  color: white;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  margin-left: 6px;
+}
+.live-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+  animation: live-blink 1.4s ease-in-out infinite;
+}
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+.course.past {
+  opacity: 0.55;
+}
+
+/* === Pause entre cours === */
+.pause {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 4px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.pause::before, .pause::after {
+  content: '';
+  flex: 1;
+  border-top: 1.5px dashed color-mix(in srgb, var(--muted) 50%, transparent);
+}
+
+/* === Résumé / prochain cours === */
+.day-summary {
+  display: flex;
+  gap: 18px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--fg-soft);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  align-items: center;
+}
+.day-summary .stat {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.day-summary .stat strong {
+  color: var(--fg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+.day-summary .stat span {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.next-course {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 70%),
+    var(--card-strong);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--fg);
+}
+.next-course .arrow {
+  font-size: 18px;
+  color: var(--accent);
+  line-height: 1;
+}
+.next-course strong { color: var(--accent); font-weight: 700; }
 
 /* === Empty / Day header === */
 .day-section h2 {
@@ -375,6 +504,76 @@ textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-siz
 .toast.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+/* === Détails d'un cours === */
+.details-dlg {
+  border: none;
+  background: transparent;
+  padding: 0;
+  max-width: 480px;
+  width: calc(100% - 24px);
+}
+.details-dlg::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.details-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+}
+.details-content::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 6px;
+  background: var(--type-color, var(--accent));
+}
+.details-content h2 {
+  margin: 8px 0 0;
+  font-size: 19px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.details-content .kv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.details-content .kv {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.details-content .kv .k {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  font-weight: 700;
+}
+.details-content .kv .v {
+  font-size: 14px;
+  color: var(--fg);
+  word-break: break-word;
+}
+.details-content .desc {
+  font-size: 13px;
+  color: var(--fg-soft);
+  white-space: pre-wrap;
+  background: var(--card);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
 }
 
 @media (prefers-reduced-motion: reduce) {
