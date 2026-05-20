@@ -26,7 +26,7 @@
   --td: #34C759;    /* vert Apple — travaux dirigés */
   --tp: #FF9500;    /* orange Apple — travaux pratiques */
   --ex: #FF3B30;    /* rouge Apple — examens */
-  --other: #AF52DE; /* violet Apple — autres */
+  --other: #8E8E93; /* gris neutre — type non détecté */
 
   /* Safe areas iOS */
   --safe-top: env(safe-area-inset-top, 0px);
@@ -55,7 +55,7 @@
     --td: #30D158;
     --tp: #FF9F0A;
     --ex: #FF453A;
-    --other: #BF5AF2;
+    --other: #98989F;
   }
 }
 
@@ -69,6 +69,15 @@ html, body {
   text-rendering: optimizeLegibility;
   overscroll-behavior-y: contain;
   min-height: 100vh;
+  /* Empêche le double-tap-to-zoom iOS sans bloquer le scroll */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button, a, .course, .wt-block, .day-pill, .seg, .icon-btn,
+.profile-row, .preset-row, .title-block {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {

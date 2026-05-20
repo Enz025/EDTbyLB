@@ -236,10 +236,16 @@
   }
   function detectType(rawText) {
     const norm = normalizeForType(rawText);
-    if (/\b(EXAM|EXAMEN|PARTIEL|RATTRAPAGE|CONTROLE|EVALUATION|DS|DSC|CC)\b/.test(norm)) return 'EX';
-    if (/\b(TP|TRAVAUX\s+PRATIQUES?)\b/.test(norm))                                       return 'TP';
-    if (/\b(TD|TRAVAUX\s+DIRIGES?)\b/.test(norm))                                         return 'TD';
-    if (/\b(CM|COURS\s+MAGISTRAL|MAGISTRAL|AMPHI)\b/.test(norm))                          return 'CM';
+    // EXAMENS
+    if (/\b(EXAM|EXAMEN|PARTIEL|RATTRAPAGE|CONTROLE|EVALUATION|DS|DSC|CC|SOUTENANCE)\b/.test(norm)) return 'EX';
+    // TP — formes longues, abrégées, suffixées (TP1, TP-A, TPA, TP_B...)
+    if (/(?:^|[^A-Z])(TP|TRAVAUX\s+PRATIQUES?)(?:[\d\s\-_:.,]|$)/.test(norm)) return 'TP';
+    if (/\b(GR(?:OUPE)?[\s_\-.]*TP)/.test(norm))                              return 'TP';
+    // TD — idem
+    if (/(?:^|[^A-Z])(TD|TRAVAUX\s+DIRIGES?)(?:[\d\s\-_:.,]|$)/.test(norm))   return 'TD';
+    if (/\b(GR(?:OUPE)?[\s_\-.]*TD)/.test(norm))                              return 'TD';
+    // CM
+    if (/(?:^|[^A-Z])(CM|COURS\s+MAGISTRAL|MAGISTRAL|AMPHI)(?:[\d\s\-_:.,]|$)/.test(norm)) return 'CM';
     return 'OTHER';
   }
   // Détection multi-champs : tente SUMMARY puis DESCRIPTION puis CATEGORIES
