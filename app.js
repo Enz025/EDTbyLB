@@ -12,11 +12,18 @@
 
   // ---------- État global ----------
   const STORAGE_KEYS = {
+    // === Système de profils (multi-classes) ===
+    profiles: 'edt.profiles.v1',  // [{id, name, type, url, events[], importedAt}]
+    active:   'edt.active.v1',    // id du profil actif
+
+    // === Anciennes clés (migration une fois puis ignorées) ===
     events:   'edt.events.v1',
-    source:   'edt.source.v1', // { type:'ics'|'json', url?:string, importedAt:number }
-    view:     'edt.view.v1',   // 'day' | 'week'
-    cursor:   'edt.cursor.v1', // ISO date (YYYY-MM-DD) du jour/semaine affiché
-    autoSync: 'edt.autoSync.v1' // '1' (on) | '0' (off)
+    source:   'edt.source.v1',
+
+    // === UI ===
+    view:     'edt.view.v1',
+    cursor:   'edt.cursor.v1',
+    autoSync: 'edt.autoSync.v1'
   };
 
   /** @type {Array<{id:string, title:string, type:string, start:Date, end:Date, room:string, teacher:string, description:string}>} */
@@ -61,6 +68,14 @@
   const weekPills = $('#weekPills');
   const pullIndicator = $('#pullIndicator');
   const pullLabel = $('#pullLabel');
+  const profileBtn = $('#profileBtn');
+  const profileName= $('#profileName');
+  const profileDlg = $('#profileDlg');
+  const profileList= $('#profileList');
+  const addProfileDetails = $('#addProfileDetails');
+  const newProfileName = $('#newProfileName');
+  const newProfileUrl  = $('#newProfileUrl');
+  const addProfileBtn  = $('#addProfileBtn');
 
   let LAST_DETAILS_EV = null;
 
@@ -108,6 +123,104 @@
   }
   function fmtTime(d) {
     return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ============================================================
+  // PROFILS (multi-classes)
+  // ============================================================
+  function newProfileId() {
+    return 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+  }
+  function loadProfilesRaw() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.profiles);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  }
+  function saveProfilesRaw(arr) {
+    try { localStorage.setItem(STORAGE_KEYS.profiles, JSON.stringify(arr)); } catch {}
+  }
+  function serializeEvents(evs) {
+    return evs.map(e => ({ ...e, start: e.start.toISOString(), end: e.end.toISOString() }));
+  }
+  function deserializeEvents(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.map(e => ({ ...e, start: new Date(e.start), end: new Date(e.end) }))
+              .filter(e => !isNaN(e.start) && !isNaN(e.end));
+  }
+  function getActiveProfile() {
+    const profiles = loadProfilesRaw();
+    if (!profiles.length) return null;
+    const id = localStorage.getItem(STORAGE_KEYS.active);
+    return profiles.find(p => p.id === id) || profiles[0];
+  }
+  function setActiveProfileId(id) {
+    localStorage.setItem(STORAGE_KEYS.active, id);
+  }
+  function updateActiveProfile(patch) {
+    const profiles = loadProfilesRaw();
+    const id = (getActiveProfile() || {}).id;
+    const idx = profiles.findIndex(p => p.id === id);
+    if (idx < 0) return;
+    profiles[idx] = { ...profiles[idx], ...patch };
+    saveProfilesRaw(profiles);
+  }
+  function addProfile({ name, type = 'ics', url = null }) {
+    const profiles = loadProfilesRaw();
+    const p = { id: newProfileId(), name: clean(name, 40) || 'Sans nom',
+                type, url: url || null, events: [], importedAt: 0 };
+    profiles.push(p);
+    saveProfilesRaw(profiles);
+    setActiveProfileId(p.id);
+    return p;
+  }
+  function removeProfile(id) {
+    let profiles = loadProfilesRaw();
+    profiles = profiles.filter(p => p.id !== id);
+    saveProfilesRaw(profiles);
+    if (localStorage.getItem(STORAGE_KEYS.active) === id) {
+      if (profiles[0]) setActiveProfileId(profiles[0].id);
+      else localStorage.removeItem(STORAGE_KEYS.active);
+    }
+  }
+  function switchProfile(id) {
+    setActiveProfileId(id);
+    const p = getActiveProfile();
+    EVENTS = deserializeEvents(p?.events || []);
+    refreshProfileChip();
+    jumpToMostRelevantDate();
+    render();
+    // sync silencieux du nouveau profil en arrière-plan
+    autoRefresh({ silent: true }).then(ok => { if (ok) render(); });
+  }
+  function refreshProfileChip() {
+    const p = getActiveProfile();
+    profileName.textContent = p ? p.name : 'Mon EDT';
+  }
+
+  // Migration : si on a des données dans les anciennes clés et aucun profil,
+  // on crée un premier profil "Mon EDT" avec ces données.
+  function migrateLegacyIfNeeded() {
+    const profiles = loadProfilesRaw();
+    if (profiles.length) return;
+    let oldEvents = [];
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.events);
+      if (raw) oldEvents = deserializeEvents(JSON.parse(raw));
+    } catch {}
+    let oldSrc = null;
+    try { oldSrc = JSON.parse(localStorage.getItem(STORAGE_KEYS.source) || 'null'); } catch {}
+    if (!oldEvents.length && !oldSrc) return;
+    const p = {
+      id: newProfileId(),
+      name: 'Mon EDT',
+      type: oldSrc?.type || 'ics',
+      url: oldSrc?.url || null,
+      events: oldEvents.length ? serializeEvents(oldEvents) : [],
+      importedAt: oldSrc?.importedAt || Date.now()
+    };
+    saveProfilesRaw([p]);
+    setActiveProfileId(p.id);
   }
 
   // ---------- Détection du type de cours ----------
@@ -302,29 +415,24 @@
 
   // ---------- Persistance ----------
   function persistEvents() {
-    const serial = EVENTS.map(e => ({
-      ...e,
-      start: e.start.toISOString(),
-      end:   e.end.toISOString()
-    }));
-    try {
-      localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(serial));
-    } catch (e) {
-      toast('Stockage local saturé.');
-    }
+    const serial = serializeEvents(EVENTS);
+    // Écriture dans le profil actif (source de vérité moderne)
+    updateActiveProfile({ events: serial });
+    // + ancienne clé pour rétro-compat
+    try { localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(serial)); } catch {}
     updateStorageInfo();
   }
   function loadEvents() {
+    // Priorité au profil actif
+    const p = getActiveProfile();
+    if (p && Array.isArray(p.events) && p.events.length) {
+      return deserializeEvents(p.events);
+    }
+    // Fallback ancienne clé (pré-migration)
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.events);
       if (!raw) return [];
-      const arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) return [];
-      return arr.map(e => ({
-        ...e,
-        start: new Date(e.start),
-        end:   new Date(e.end)
-      })).filter(e => !isNaN(e.start) && !isNaN(e.end));
+      return deserializeEvents(JSON.parse(raw));
     } catch { return []; }
   }
   function updateStorageInfo() {
@@ -650,6 +758,100 @@
     if (navigator.vibrate) { try { navigator.vibrate(ms); } catch {} }
   }
 
+  // === Dialogue "Mes classes" ===
+  function renderProfileList() {
+    clearNode(profileList);
+    const profiles = loadProfilesRaw();
+    const activeId = (getActiveProfile() || {}).id;
+    if (!profiles.length) {
+      const li = document.createElement('li');
+      li.className = 'profile-empty';
+      li.textContent = "Aucune classe enregistrée. Ajoute-en une ci-dessous.";
+      profileList.appendChild(li);
+      return;
+    }
+    for (const p of profiles) {
+      const li = document.createElement('li');
+      li.className = 'profile-row' + (p.id === activeId ? ' active' : '');
+
+      const sw = document.createElement('button');
+      sw.type = 'button'; sw.className = 'switch';
+      const name = document.createElement('span'); name.className = 'name'; name.textContent = p.name;
+      const meta = document.createElement('span'); meta.className = 'meta';
+      const count = Array.isArray(p.events) ? p.events.length : 0;
+      const when = p.importedAt
+        ? new Date(p.importedAt).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' })
+        : '—';
+      meta.textContent = `${count} cours · sync ${when}`;
+      sw.appendChild(name); sw.appendChild(meta);
+      sw.addEventListener('click', () => {
+        if (p.id === activeId) { profileDlg.close(); return; }
+        haptic(10);
+        switchProfile(p.id);
+        toast(`Classe : ${p.name}`);
+        profileDlg.close();
+      });
+
+      const del = document.createElement('button');
+      del.type = 'button'; del.className = 'del'; del.setAttribute('aria-label', 'Supprimer ' + p.name);
+      del.textContent = '✕';
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!confirm(`Supprimer la classe « ${p.name} » ?`)) return;
+        removeProfile(p.id);
+        const next = getActiveProfile();
+        EVENTS = deserializeEvents(next?.events || []);
+        refreshProfileChip();
+        render();
+        renderProfileList();
+      });
+
+      li.appendChild(sw);
+      li.appendChild(del);
+      profileList.appendChild(li);
+    }
+  }
+
+  profileBtn.addEventListener('click', () => {
+    haptic(8);
+    renderProfileList();
+    addProfileDetails.open = false;
+    newProfileName.value = '';
+    newProfileUrl.value = '';
+    if (typeof profileDlg.showModal === 'function') profileDlg.showModal();
+    else profileDlg.setAttribute('open', '');
+  });
+
+  addProfileBtn.addEventListener('click', async () => {
+    const name = newProfileName.value.trim();
+    const url  = newProfileUrl.value.trim();
+    if (!name) { toast('Donne un nom à cette classe'); return; }
+    let safeUrl = null;
+    if (url) {
+      try { safeUrl = safeIcsUrl(url); }
+      catch (e) { toast(e.message); return; }
+    }
+    addProfileBtn.disabled = true;
+    try {
+      const p = addProfile({ name, type: 'ics', url: safeUrl });
+      EVENTS = [];
+      refreshProfileChip();
+      render();
+      renderProfileList();
+      toast(`Classe « ${p.name} » ajoutée`);
+      // Si une URL est fournie, on tente une première sync tout de suite
+      if (safeUrl) {
+        const ok = await autoRefresh({ silent: false });
+        if (ok) { jumpToMostRelevantDate(); render(); renderProfileList(); }
+      }
+      addProfileDetails.open = false;
+      newProfileName.value = '';
+      newProfileUrl.value  = '';
+    } finally {
+      addProfileBtn.disabled = false;
+    }
+  });
+
   // ---------- Navigation ----------
   function step(delta) {
     if (VIEW === 'day') CURSOR = addDays(CURSOR, delta);
@@ -727,8 +929,12 @@
       const evs = parseICS(text);
       if (!evs.length) throw new Error('Aucun événement trouvé.');
       EVENTS = evs;
+      // Met à jour le profil actif (ou en crée un s'il n'y en a aucun)
+      if (!getActiveProfile()) addProfile({ name: 'Mon EDT', type: 'ics', url });
+      else updateActiveProfile({ type: 'ics', url });
       persistEvents();
-      localStorage.setItem(STORAGE_KEYS.source, JSON.stringify({ type: 'ics', url, importedAt: Date.now() }));
+      updateActiveProfile({ importedAt: Date.now() });
+      refreshProfileChip();
       jumpToMostRelevantDate();
       toast(`${evs.length} cours · ${importRangeLabel()}`, 4500);
       render();
@@ -747,8 +953,11 @@
       const evs = parseICS(text);
       if (!evs.length) throw new Error('Aucun événement trouvé.');
       EVENTS = evs;
+      if (!getActiveProfile()) addProfile({ name: 'Mon EDT', type: 'ics', url: null });
+      else updateActiveProfile({ type: 'ics' });
       persistEvents();
-      localStorage.setItem(STORAGE_KEYS.source, JSON.stringify({ type: 'ics', importedAt: Date.now() }));
+      updateActiveProfile({ importedAt: Date.now() });
+      refreshProfileChip();
       jumpToMostRelevantDate();
       toast(`${evs.length} cours · ${importRangeLabel()}`, 4500);
       render();
@@ -766,8 +975,11 @@
       const evs = parseManualJSON(txt);
       if (!evs.length) throw new Error('Aucun événement valide.');
       EVENTS = evs;
+      if (!getActiveProfile()) addProfile({ name: 'Mon EDT (JSON)', type: 'json' });
+      else updateActiveProfile({ type: 'json', url: null });
       persistEvents();
-      localStorage.setItem(STORAGE_KEYS.source, JSON.stringify({ type: 'json', importedAt: Date.now() }));
+      updateActiveProfile({ importedAt: Date.now() });
+      refreshProfileChip();
       jumpToMostRelevantDate();
       toast(`${evs.length} cours · ${importRangeLabel()}`, 4500);
       render();
@@ -775,9 +987,10 @@
   });
 
   clearBtn.addEventListener('click', () => {
-    if (!confirm('Effacer toutes les données locales ?')) return;
+    if (!confirm('Effacer toutes les classes et données locales ?')) return;
     Object.values(STORAGE_KEYS).forEach(k => { try { localStorage.removeItem(k); } catch {} });
     EVENTS = []; VIEW = 'day'; CURSOR = new Date();
+    refreshProfileChip();
     render();
     updateStorageInfo();
     toast('Données effacées.');
@@ -789,13 +1002,13 @@
     if (state !== 'idle') syncBtn.classList.add(state);
   }
 
-  // === Auto-refresh depuis la dernière URL ADE enregistrée ===
+  // === Auto-refresh depuis la dernière URL ADE du profil actif ===
   async function autoRefresh({ silent = true } = {}) {
-    const src = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.source) || 'null'); } catch { return null; } })();
-    if (!src || src.type !== 'ics' || !src.url) return false;
+    const p = getActiveProfile();
+    if (!p || p.type !== 'ics' || !p.url) return false;
     setSyncState('syncing');
     try {
-      const url = safeIcsUrl(src.url);
+      const url = safeIcsUrl(p.url);
       const fetchUrl = resolveFetchUrl(url);
       const res = await fetch(fetchUrl, { credentials: 'omit', redirect: 'follow' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -804,10 +1017,9 @@
       if (!evs.length) throw new Error('Vide');
       EVENTS = evs;
       persistEvents();
-      localStorage.setItem(STORAGE_KEYS.source, JSON.stringify({ ...src, importedAt: Date.now() }));
+      updateActiveProfile({ importedAt: Date.now() });
       setSyncState('synced');
       if (!silent) toast(`${evs.length} cours · à jour`, 2500);
-      // garde l'icône "synced" 2.5s puis revient à idle
       setTimeout(() => setSyncState('idle'), 2500);
       return true;
     } catch (e) {
@@ -912,11 +1124,13 @@
 
   // ---------- Démarrage ----------
   function bootstrap() {
+    migrateLegacyIfNeeded();
     EVENTS = loadEvents();
-    if (!EVENTS.length) {
-      // Démo : journée type si l'utilisateur n'a encore rien importé
+    if (!EVENTS.length && !getActiveProfile()) {
+      // Démo : journée type si l'utilisateur n'a encore rien importé/configuré
       EVENTS = demoEvents();
     }
+    refreshProfileChip();
     render();
     updateStorageInfo();
     // Auto-refresh silencieux au démarrage si une URL ADE est configurée

@@ -49,7 +49,12 @@
     <nav class="viewswitch glass" role="tablist" aria-label="Vue">
       <button class="seg active" data-view="day" role="tab" aria-selected="true">Jour</button>
       <button class="seg" data-view="week" role="tab" aria-selected="false">Semaine</button>
-      <button class="seg" id="todayBtn">Aujourd'hui</button>
+      <button class="seg" id="todayBtn" aria-label="Aujourd'hui">◉</button>
+      <button class="seg profile-chip" id="profileBtn" aria-label="Changer de classe">
+        <span class="prefix">👤</span>
+        <span id="profileName">Mon EDT</span>
+        <span class="caret">▾</span>
+      </button>
       <button class="seg" id="settingsBtn" aria-label="Réglages">⚙︎</button>
     </nav>
 
@@ -130,6 +135,34 @@
           <button type="button" class="btn" id="copyDetailsBtn">Copier</button>
           <button type="submit" class="btn primary">Fermer</button>
         </div>
+      </form>
+    </dialog>
+
+    <dialog id="profileDlg" class="profile-dlg">
+      <form method="dialog" class="profile-form glass">
+        <header class="profile-head">
+          <h2>Mes classes</h2>
+          <button type="submit" class="icon-btn" aria-label="Fermer">✕</button>
+        </header>
+
+        <ul class="profile-list" id="profileList"><!-- rempli par JS --></ul>
+
+        <details id="addProfileDetails">
+          <summary class="add-summary">
+            <span>＋ Ajouter une classe</span>
+          </summary>
+          <div class="add-fields">
+            <label class="field">
+              <span>Nom de la classe</span>
+              <input type="text" id="newProfileName" placeholder="L2 INFO Lens" maxlength="40" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>URL ADE (.ics)</span>
+              <input type="url" id="newProfileUrl" placeholder="https://ade-consult.univ-artois.fr/jsp/custom/…" inputmode="url" autocomplete="off" />
+            </label>
+            <button type="button" class="btn primary" id="addProfileBtn">Ajouter et activer</button>
+          </div>
+        </details>
       </form>
     </dialog>
 
