@@ -1296,8 +1296,37 @@
   if ('serviceWorker' in navigator) {
     const ok = location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname);
     if (ok) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js').catch(() => {/* silencieux */});
+      window.addEventListener('load', async () => {
+        try {
+          const reg = await navigator.serviceWorker.register('./service-worker.js');
+
+          // Détecte une nouvelle version installée et prête à prendre le relais
+          const onUpdate = (worker) => {
+            worker.addEventListener('statechange', () => {
+              if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Nouvelle version dispo, on l'active tout de suite
+                worker.postMessage('SKIP_WAITING');
+              }
+            });
+          };
+          if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+          reg.addEventListener('updatefound', () => {
+            if (reg.installing) onUpdate(reg.installing);
+          });
+
+          // Quand le contrôleur SW change (nouveau SW actif), on recharge une fois
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            location.reload();
+          });
+
+          // Vérifie une mise à jour à chaque retour en avant-plan
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) reg.update().catch(() => {});
+          });
+        } catch {/* silencieux */}
       });
     }
   }
