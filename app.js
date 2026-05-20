@@ -190,11 +190,12 @@
     setActiveProfileId(id);
     const p = getActiveProfile();
     EVENTS = deserializeEvents(p?.events || []);
+    ensureModuleColors();
     refreshProfileChip();
     jumpToMostRelevantDate();
     render();
     // sync silencieux du nouveau profil en arrière-plan
-    autoRefresh({ silent: true }).then(ok => { if (ok) render(); });
+    autoRefresh({ silent: true }).then(ok => { if (ok) { ensureModuleColors(); render(); } });
   }
   function refreshProfileChip() {
     const p = getActiveProfile();
@@ -280,36 +281,52 @@
     return m ? m[1].toUpperCase() : null;
   }
 
-  // Palette de couleurs vibrantes iOS (16 teintes bien distinctes)
-  const MODULE_PALETTE = [
-    '#FF2D55', // rose
-    '#FF3B30', // rouge
-    '#FF6B22', // orange foncé
-    '#FF9500', // orange
-    '#FFCC00', // jaune
-    '#9DC83C', // citron
-    '#34C759', // vert
-    '#00C7BE', // mint
-    '#30B0C7', // teal
-    '#5AC8FA', // cyan
-    '#007AFF', // bleu
-    '#5856D6', // indigo
-    '#AF52DE', // violet
-    '#BF5AF2', // mauve
-    '#A2845E', // brun
-    '#9C7B58'  // beige
-  ];
-  // FNV-1a 32-bit sur la chaîne INVERSÉE → donne du poids au suffixe variable
-  // (R2.01, R2.02, R2.10, R2.11 doivent donner 4 couleurs très différentes,
-  //  pas dominées par le préfixe commun "R2.")
+  // === Couleur par module : angle d'or → écart maximal sur le cercle chromatique ===
+  // L'index de chaque code module est mémorisé (localStorage) pour garantir
+  // qu'un module garde la même couleur d'une semaine / session à l'autre.
+  // Un nouveau module ajouté reçoit le prochain index → nouvelle couleur unique.
+  const MODULE_INDEX_KEY = 'edt.moduleIndex.v1';
+  const GOLDEN_ANGLE = 137.50776405003785; // optimal pour répartir N couleurs
+  let MODULE_INDEX = new Map(); // code → index entier
+  let MODULE_COLOR = new Map(); // code → string hsl(...)
+
+  function loadModuleIndex() {
+    try {
+      const raw = localStorage.getItem(MODULE_INDEX_KEY);
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      MODULE_INDEX = new Map(Object.entries(obj).filter(([_, v]) => Number.isFinite(v)));
+    } catch {}
+  }
+  function saveModuleIndex() {
+    try { localStorage.setItem(MODULE_INDEX_KEY, JSON.stringify(Object.fromEntries(MODULE_INDEX))); } catch {}
+  }
+  function ensureModuleColors() {
+    // Récupère tous les codes modules visibles, attribue un index à chaque nouveau
+    let dirty = false;
+    for (const ev of EVENTS) {
+      const code = extractModuleCode(ev.title);
+      if (code && !MODULE_INDEX.has(code)) {
+        MODULE_INDEX.set(code, MODULE_INDEX.size);
+        dirty = true;
+      }
+    }
+    if (dirty) saveModuleIndex();
+    rebuildModuleColors();
+  }
+  function rebuildModuleColors() {
+    MODULE_COLOR = new Map();
+    for (const [code, i] of MODULE_INDEX) {
+      const hue = ((i * GOLDEN_ANGLE) + 18) % 360;
+      // Légère variation de saturation/lumi pour diversité encore plus grande
+      const sat = 68 + ((i * 13) % 18); // 68-85
+      const lit = 54 + ((i * 7)  % 10); // 54-63
+      MODULE_COLOR.set(code, `hsl(${hue.toFixed(1)}, ${sat}%, ${lit}%)`);
+    }
+  }
   function colorForModule(code) {
     if (!code) return null;
-    let h = 0x811c9dc5;
-    for (let i = code.length - 1; i >= 0; i--) {
-      h ^= code.charCodeAt(i);
-      h = Math.imul(h, 0x01000193);
-    }
-    return MODULE_PALETTE[(h >>> 0) % MODULE_PALETTE.length];
+    return MODULE_COLOR.get(code) || 'var(--other)';
   }
 
   // Résout la couleur ET le label badge :
@@ -1193,6 +1210,7 @@
       else updateActiveProfile({ type: 'ics', url });
       persistEvents();
       updateActiveProfile({ importedAt: Date.now() });
+      ensureModuleColors();
       refreshProfileChip();
       jumpToMostRelevantDate();
       toast(`${evs.length} cours · ${importRangeLabel()}`, 4500);
@@ -1216,6 +1234,7 @@
       else updateActiveProfile({ type: 'ics' });
       persistEvents();
       updateActiveProfile({ importedAt: Date.now() });
+      ensureModuleColors();
       refreshProfileChip();
       jumpToMostRelevantDate();
       toast(`${evs.length} cours · ${importRangeLabel()}`, 4500);
@@ -1238,6 +1257,7 @@
       else updateActiveProfile({ type: 'json', url: null });
       persistEvents();
       updateActiveProfile({ importedAt: Date.now() });
+      ensureModuleColors();
       refreshProfileChip();
       jumpToMostRelevantDate();
       toast(`${evs.length} cours · ${importRangeLabel()}`, 4500);
@@ -1277,6 +1297,7 @@
       EVENTS = evs;
       persistEvents();
       updateActiveProfile({ importedAt: Date.now() });
+      ensureModuleColors();
       setSyncState('synced');
       if (!silent) toast(`${evs.length} cours · à jour`, 2500);
       setTimeout(() => setSyncState('idle'), 2500);
@@ -1411,6 +1432,7 @@
   // ---------- Démarrage ----------
   async function bootstrap() {
     migrateLegacyIfNeeded();
+    loadModuleIndex();
     handleMagicLink();
     await loadPresets();
     EVENTS = loadEvents();
@@ -1418,11 +1440,12 @@
       // Démo : journée type si l'utilisateur n'a encore rien importé/configuré
       EVENTS = demoEvents();
     }
+    ensureModuleColors();
     refreshProfileChip();
     render();
     updateStorageInfo();
     // Auto-refresh silencieux au démarrage si une URL ADE est configurée
-    autoRefresh({ silent: true }).then(ok => { if (ok) render(); });
+    autoRefresh({ silent: true }).then(ok => { if (ok) { ensureModuleColors(); render(); } });
   }
 
   // Saute sur la date la plus pertinente parmi EVENTS :
