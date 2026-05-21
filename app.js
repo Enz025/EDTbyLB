@@ -1014,7 +1014,15 @@
     if (!profiles.length) {
       const li = document.createElement('li');
       li.className = 'profile-empty';
-      li.textContent = "Aucune classe enregistrée. Ajoute-en une ci-dessous.";
+      const t = document.createElement('strong');
+      t.style.display = 'block';
+      t.style.fontSize = '15px';
+      t.style.color = 'var(--fg)';
+      t.style.marginBottom = '6px';
+      t.textContent = '👋 Bienvenue !';
+      const s = document.createElement('span');
+      s.textContent = 'Choisis ta classe ci-dessous pour charger ton emploi du temps automatiquement.';
+      li.appendChild(t); li.appendChild(s);
       profileList.appendChild(li);
       return;
     }
@@ -1145,16 +1153,26 @@
     }
   }
 
-  profileBtn.addEventListener('click', () => {
+  function openProfileDialog() {
     haptic(8);
     renderProfileList();
     renderPresetsList();
-    addProfileDetails.open = false;
-    newProfileName.value = '';
-    newProfileUrl.value = '';
-    if (typeof profileDlg.showModal === 'function') profileDlg.showModal();
-    else profileDlg.setAttribute('open', '');
-  });
+    if (addProfileDetails) addProfileDetails.open = false;
+    if (newProfileName) newProfileName.value = '';
+    if (newProfileUrl)  newProfileUrl.value = '';
+    if (!profileDlg) return;
+    try {
+      if (typeof profileDlg.showModal === 'function' && !profileDlg.open) {
+        profileDlg.showModal();
+      } else {
+        profileDlg.setAttribute('open', '');
+      }
+    } catch (e) {
+      // Fallback : forcer l'ouverture sans modal
+      profileDlg.setAttribute('open', '');
+    }
+  }
+  profileBtn.addEventListener('click', openProfileDialog);
 
   addProfileBtn.addEventListener('click', async () => {
     const name = newProfileName.value.trim();
@@ -1498,7 +1516,8 @@
     handleMagicLink();
     await loadPresets();
     EVENTS = loadEvents();
-    if (!EVENTS.length && !getActiveProfile()) {
+    const noProfile = !getActiveProfile();
+    if (!EVENTS.length && noProfile) {
       // Démo : journée type si l'utilisateur n'a encore rien importé/configuré
       EVENTS = demoEvents();
     }
@@ -1508,6 +1527,13 @@
     updateStorageInfo();
     // Auto-refresh silencieux au démarrage si une URL ADE est configurée
     autoRefresh({ silent: true }).then(ok => { if (ok) { ensureModuleColors(); render(); } });
+
+    // === Onboarding : si aucune classe configurée, ouvre auto le menu ===
+    // (Geste utilisateur attendu pour showModal sur certains navigateurs,
+    // mais Safari/Chrome modernes l'autorisent juste après load)
+    if (noProfile && PRESETS.length) {
+      setTimeout(() => openProfileDialog(), 350);
+    }
   }
 
   // Saute sur la date la plus pertinente parmi EVENTS :

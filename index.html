@@ -41,7 +41,8 @@
         <span class="sync-icon" id="syncIcon">↻</span>
       </button>
       <button class="icon-btn" id="nextBtn" aria-label="Suivant">›</button>
-      <input type="date" id="datePicker" class="visually-hidden" />
+      <input type="date" id="datePicker" class="visually-hidden" aria-hidden="true" tabindex="-1"
+             style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;clip:rect(0,0,0,0);overflow:hidden;border:0;padding:0;margin:-1px;left:0;top:0;" />
     </header>
 
     <nav class="weekpills glass" id="weekPills" aria-label="Jours de la semaine"></nav>
