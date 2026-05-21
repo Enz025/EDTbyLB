@@ -1,11 +1,32 @@
 {
-  "_comment": "Classes Artois préconfigurées. Pour ajouter ta classe : envoie ton URL ADE à Enzo.",
+  "_comment": "Classes Artois préconfigurées. Les catalogues sont des URL ADE multi-groupes filtrées côté client.",
   "campus": "Université d'Artois",
   "classes": [
     {
       "name": "BUT INFO 1A — Groupe C1 (Lens)",
       "url": "https://ade-consult.univ-artois.fr/jsp/custom/modules/plannings/rY64beWz.shu",
       "tag": "Lens"
+    }
+  ],
+  "catalogs": [
+    {
+      "name": "BUT INFO (tous groupes)",
+      "url": "https://ade-consult.univ-artois.fr/jsp/custom/modules/plannings/ZYjybX3B.shu",
+      "tag": "Lens",
+      "groups": [
+        { "id": "B1-A1", "label": "BUT INFO 1A — A1" },
+        { "id": "B1-A2", "label": "BUT INFO 1A — A2" },
+        { "id": "B1-B1", "label": "BUT INFO 1A — B1" },
+        { "id": "B1-B2", "label": "BUT INFO 1A — B2" },
+        { "id": "B1-C1", "label": "BUT INFO 1A — C1" },
+        { "id": "B1-C2", "label": "BUT INFO 1A — C2" },
+        { "id": "B2-A",  "label": "BUT INFO 2A — A"  },
+        { "id": "B2-B",  "label": "BUT INFO 2A — B"  },
+        { "id": "B2-C",  "label": "BUT INFO 2A — C"  },
+        { "id": "B3-A",  "label": "BUT INFO 3A — A"  },
+        { "id": "B3-B",  "label": "BUT INFO 3A — B"  },
+        { "id": "B3-C",  "label": "BUT INFO 3A — C"  }
+      ]
     }
   ]
 }

@@ -80,7 +80,7 @@
   const presetsList    = $('#presetsList');
 
   let LAST_DETAILS_EV = null;
-  let PRESETS = []; // [{name, url, tag?}]
+  let PRESETS = []; // [{name, url, tag?, filter?:{year,sub}}]
 
   // ---------- Utilitaires ----------
   function toast(msg, ms = 2200) {
@@ -168,10 +168,11 @@
     profiles[idx] = { ...profiles[idx], ...patch };
     saveProfilesRaw(profiles);
   }
-  function addProfile({ name, type = 'ics', url = null }) {
+  function addProfile({ name, type = 'ics', url = null, filter = null }) {
     const profiles = loadProfilesRaw();
     const p = { id: newProfileId(), name: clean(name, 40) || 'Sans nom',
-                type, url: url || null, events: [], importedAt: 0 };
+                type, url: url || null, events: [], importedAt: 0,
+                filter: filter || null };
     profiles.push(p);
     saveProfilesRaw(profiles);
     setActiveProfileId(p.id);
@@ -1060,15 +1061,54 @@
   }
 
   // === Chargement des classes préconfigurées (presets.json) ===
+  // Les catalogues (URL contenant plusieurs groupes) sont auto-dépliés en
+  // autant de presets que de groupes, chacun avec un filtre {year, sub}.
   async function loadPresets() {
     try {
       const res = await fetch('./presets.json', { cache: 'no-cache' });
       if (!res.ok) return;
       const data = await res.json();
-      if (data && Array.isArray(data.classes)) {
-        PRESETS = data.classes.filter(c => c && c.name && c.url);
+      const list = [];
+      if (Array.isArray(data?.classes)) {
+        for (const c of data.classes) {
+          if (c && c.name && c.url) list.push(c);
+        }
       }
+      if (Array.isArray(data?.catalogs)) {
+        for (const cat of data.catalogs) {
+          if (!cat || !cat.url || !Array.isArray(cat.groups)) continue;
+          for (const g of cat.groups) {
+            if (!g || !g.id || !g.label) continue;
+            const [year, sub] = g.id.split('-');
+            if (!year || !sub) continue;
+            list.push({
+              name: g.label,
+              url: cat.url,
+              tag: cat.tag,
+              filter: { year, sub }
+            });
+          }
+        }
+      }
+      PRESETS = list;
     } catch {/* silencieux : pas de presets, pas grave */}
+  }
+
+  // Construit la regex de filtre pour un groupe ADE Artois BUT INFO :
+  //   year='B1', sub='C1'  →  /B1INFOS?\d*(?:CM|TDC|TPC1)\b/i
+  // Matche les codes de cours (CM commun, TD par lettre, TP par sous-groupe complet)
+  function filterRegexFor(year, sub) {
+    if (!year || !sub) return null;
+    const tdLetter = sub.charAt(0).toUpperCase();
+    const tpSub = sub.toUpperCase();
+    return new RegExp(`${year}INFOS?\\d*(?:CM|TD${tdLetter}|TP${tpSub})\\b`, 'i');
+  }
+  // Filtre une liste d'événements ICS selon le filtre d'un profil
+  function applyProfileFilter(events, filter) {
+    if (!filter || !filter.year || !filter.sub) return events;
+    const re = filterRegexFor(filter.year, filter.sub);
+    if (!re) return events;
+    return events.filter(ev => re.test(ev.description || '') || re.test(ev.title || ''));
   }
   function renderPresetsList() {
     clearNode(presetsList);
@@ -1091,7 +1131,7 @@
         let safeUrl;
         try { safeUrl = safeIcsUrl(preset.url); }
         catch (e) { toast('URL invalide : ' + e.message); return; }
-        const p = addProfile({ name: preset.name, type: 'ics', url: safeUrl });
+        const p = addProfile({ name: preset.name, type: 'ics', url: safeUrl, filter: preset.filter || null });
         EVENTS = [];
         refreshProfileChip();
         render();
@@ -1310,8 +1350,12 @@
       const res = await fetch(fetchUrl, { credentials: 'omit', redirect: 'follow' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const text = await res.text();
-      const evs = parseICS(text);
-      if (!evs.length) throw new Error('Vide');
+      const allEvs = parseICS(text);
+      if (!allEvs.length) throw new Error('Vide');
+      // Si le profil a un filtre (cas d'un catalogue multi-groupes), on
+      // ne garde que les événements correspondant au sous-groupe choisi.
+      const evs = applyProfileFilter(allEvs, p.filter);
+      if (!evs.length) throw new Error('Aucun cours pour ce groupe');
       EVENTS = evs;
       persistEvents();
       updateActiveProfile({ importedAt: Date.now() });
