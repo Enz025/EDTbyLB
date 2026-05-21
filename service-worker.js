@@ -3,7 +3,7 @@
    - App shell (HTML/CSS/JS/manifest/icons) : cache-first
    - Données .ics : network-first avec fallback cache (pour rester utilisable hors-ligne) */
 
-const VERSION = 'edt-v1.9.3';
+const VERSION = 'edt-v1.9.4';
 const SHELL_CACHE = `shell-${VERSION}`;
 const DATA_CACHE  = `data-${VERSION}`;
 
@@ -55,6 +55,14 @@ self.addEventListener('fetch', (event) => {
   // presets.json + reset.js : network-first pour récupérer les MAJ critiques
   if (url.pathname.endsWith('/presets.json') || url.pathname.endsWith('/reset.js')) {
     event.respondWith(networkFirst(req, DATA_CACHE));
+    return;
+  }
+
+  // clear.html : NEVER caché par le SW (laissée passer en network direct).
+  // Permet à l'utilisateur de retrouver une page de nettoyage fonctionnelle
+  // même si tout le reste de l'app shell est obsolète.
+  if (url.pathname.endsWith('/clear.html')) {
+    // event.respondWith pas appelé → le navigateur fetche normalement
     return;
   }
 

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Réinitialisation EDT</title>
+  <style>
+    :root { color-scheme: light dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #0a0a0f;
+      color: #f3f4f8;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wrap {
+      max-width: 460px;
+      width: calc(100% - 32px);
+      padding: 32px 24px;
+      text-align: center;
+      background: rgba(28, 30, 44, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 22px;
+      backdrop-filter: blur(20px);
+    }
+    h1 { margin: 0 0 12px; font-size: 22px; font-weight: 700; }
+    p  { margin: 0; color: #8a8d99; font-size: 14px; line-height: 1.5; }
+    .spin {
+      display: inline-block;
+      width: 32px; height: 32px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #0a84ff;
+      border-radius: 50%;
+      margin-bottom: 16px;
+      animation: spin 0.9s linear infinite;
+    }
+    .ok .spin { animation: none; border: 3px solid transparent; }
+    .ok::before {
+      content: '✓';
+      display: block;
+      font-size: 36px;
+      color: #34c759;
+      margin-bottom: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .small { color: #6a6d79; font-size: 11.5px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="card">
+    <div class="spin"></div>
+    <h1 id="title">Réinitialisation en cours…</h1>
+    <p id="status">Nettoyage du cache navigateur…</p>
+    <p class="small">Cette page va te rediriger vers ton EDT dans quelques secondes.</p>
+  </div>
+  <script>
+    (async function () {
+      const status = document.getElementById('status');
+      const title = document.getElementById('title');
+      const card = document.getElementById('card');
+      function setStatus(s) { status.textContent = s; }
+      try {
+        setStatus('Désinscription du Service Worker…');
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister().catch(() => {})));
+        }
+        setStatus('Vidage des caches…');
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k).catch(() => {})));
+        }
+        setStatus('Effacement des données locales…');
+        try { localStorage.clear(); } catch (e) {}
+        try { sessionStorage.clear(); } catch (e) {}
+        title.textContent = 'Terminé !';
+        setStatus('Redirection vers ton EDT…');
+        card.classList.add('ok');
+        setTimeout(function () {
+          location.replace('./?_t=' + Date.now());
+        }, 900);
+      } catch (e) {
+        title.textContent = 'Erreur';
+        setStatus('Détails : ' + (e && e.message ? e.message : 'inconnue'));
+      }
+    })();
+  </script>
+</body>
+</html>
