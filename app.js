@@ -10,6 +10,35 @@
 (() => {
   'use strict';
 
+  const APP_VERSION = 'v1.9.1';
+
+  // === Kill switch : ?reset purge tout (SW, caches, localStorage) ===
+  // Permet de débloquer un user coincé sur une ancienne version cachée.
+  // Usage : https://edt.25nzo.eu/?reset
+  (async () => {
+    const u = new URL(location.href);
+    if (!u.searchParams.has('reset') && !u.searchParams.has('fresh')) return;
+    const keepProfiles = u.searchParams.has('fresh'); // ?fresh = soft, ?reset = hard
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      if (!keepProfiles) {
+        try { localStorage.clear(); } catch {}
+      }
+    } catch {}
+    // Reload sans le param et sans cache
+    u.searchParams.delete('reset');
+    u.searchParams.delete('fresh');
+    u.searchParams.set('_t', Date.now().toString()); // cache buster
+    location.replace(u.toString());
+  })();
+
   // ---------- État global ----------
   const STORAGE_KEYS = {
     // === Système de profils (multi-classes) ===
@@ -50,6 +79,8 @@
   const loadJsonBtn= $('#loadJsonBtn');
   const clearBtn   = $('#clearBtn');
   const storageInfo= $('#storageInfo');
+  const versionInfo= $('#versionInfo');
+  const forceUpdateBtn = $('#forceUpdateBtn');
   const toastEl    = $('#toast');
   const detailsDlg = $('#detailsDlg');
   const detailsBadge   = $('#detailsBadge');
@@ -559,10 +590,18 @@
       catch { return null; }
     })();
     const n = EVENTS.length;
-    if (!n) { storageInfo.textContent = 'Aucune donnée stockée.'; return; }
-    const when = src?.importedAt ? new Date(src.importedAt).toLocaleString('fr-FR') : '—';
-    const type = src?.type === 'ics' ? '.ics' : (src?.type === 'json' ? 'JSON' : '?');
-    storageInfo.textContent = `${n} événement(s) — source ${type} — importé le ${when}`;
+    if (n) {
+      const when = src?.importedAt ? new Date(src.importedAt).toLocaleString('fr-FR') : '—';
+      const type = src?.type === 'ics' ? '.ics' : (src?.type === 'json' ? 'JSON' : '?');
+      storageInfo.textContent = `${n} événement(s) — source ${type} — importé le ${when}`;
+    } else {
+      storageInfo.textContent = 'Aucune donnée stockée.';
+    }
+    // Affiche la version JS courante (utile pour diagnostiquer les caches obstinés)
+    if (versionInfo) {
+      const swSet = (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) ? '✓' : '–';
+      versionInfo.textContent = `App ${APP_VERSION} · SW ${swSet}`;
+    }
   }
 
   // ---------- Rendu (SANS innerHTML) ----------
@@ -1427,6 +1466,27 @@
       toast(`${evs.length} cours · ${importRangeLabel()}`, 4500);
       render();
     } catch (e) { toast(e.message); }
+  });
+
+  // Bouton "Forcer la mise à jour" : désinscrit le SW, vide les caches,
+  // recharge avec un cache-buster. Garde les profils par défaut.
+  if (forceUpdateBtn) forceUpdateBtn.addEventListener('click', async () => {
+    forceUpdateBtn.disabled = true;
+    forceUpdateBtn.textContent = '↻ Mise à jour…';
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+    } catch {}
+    // Recharge en hard avec cache-buster pour bypasser tout cache HTTP
+    const u = new URL(location.href);
+    u.searchParams.set('_t', Date.now().toString());
+    location.replace(u.toString());
   });
 
   clearBtn.addEventListener('click', () => {
