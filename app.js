@@ -10,7 +10,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 'v1.9.4';
+  const APP_VERSION = 'v1.9.5';
 
   // === Kill switch : ?reset purge tout (SW, caches, localStorage) ===
   // Permet de débloquer un user coincé sur une ancienne version cachée.
