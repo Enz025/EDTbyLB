@@ -10,7 +10,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 'v1.9.1';
+  const APP_VERSION = 'v1.9.2';
 
   // === Kill switch : ?reset purge tout (SW, caches, localStorage) ===
   // Permet de débloquer un user coincé sur une ancienne version cachée.
@@ -117,7 +117,6 @@
   // (ex : protocole file://, hébergement statique fermé, etc.)
   const CATALOG_URL_DEFAULT = 'https://ade-consult.univ-artois.fr/jsp/custom/modules/plannings/ZYjybX3B.shu';
   const FALLBACK_PRESETS = [
-    { name: 'BUT INFO 1A — Groupe C1 (Lens)', url: 'https://ade-consult.univ-artois.fr/jsp/custom/modules/plannings/rY64beWz.shu', tag: 'Lens' },
     { name: 'BUT INFO 1A — A1', url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B1', sub: 'A1' } },
     { name: 'BUT INFO 1A — A2', url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B1', sub: 'A2' } },
     { name: 'BUT INFO 1A — B1', url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B1', sub: 'B1' } },

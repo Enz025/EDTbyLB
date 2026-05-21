@@ -1,13 +1,7 @@
 {
-  "_comment": "Classes Artois préconfigurées. Les catalogues sont des URL ADE multi-groupes filtrées côté client.",
+  "_comment": "Classes Artois préconfigurées. Catalogue multi-groupes avec filtrage côté client.",
   "campus": "Université d'Artois",
-  "classes": [
-    {
-      "name": "BUT INFO 1A — Groupe C1 (Lens)",
-      "url": "https://ade-consult.univ-artois.fr/jsp/custom/modules/plannings/rY64beWz.shu",
-      "tag": "Lens"
-    }
-  ],
+  "classes": [],
   "catalogs": [
     {
       "name": "BUT INFO (tous groupes)",
