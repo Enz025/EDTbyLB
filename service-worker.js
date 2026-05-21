@@ -3,7 +3,7 @@
    - App shell (HTML/CSS/JS/manifest/icons) : cache-first
    - Données .ics : network-first avec fallback cache (pour rester utilisable hors-ligne) */
 
-const VERSION = 'edt-v1.9.2';
+const VERSION = 'edt-v1.9.3';
 const SHELL_CACHE = `shell-${VERSION}`;
 const DATA_CACHE  = `data-${VERSION}`;
 
@@ -52,8 +52,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // presets.json : network-first pour avoir les ajouts récents
-  if (url.pathname.endsWith('/presets.json')) {
+  // presets.json + reset.js : network-first pour récupérer les MAJ critiques
+  if (url.pathname.endsWith('/presets.json') || url.pathname.endsWith('/reset.js')) {
     event.respondWith(networkFirst(req, DATA_CACHE));
     return;
   }
