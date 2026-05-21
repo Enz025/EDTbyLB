@@ -82,6 +82,25 @@
   let LAST_DETAILS_EV = null;
   let PRESETS = []; // [{name, url, tag?, filter?:{year,sub}}]
 
+  // Fallback embarqué dans le bundle JS, utilisé si fetch('./presets.json') échoue
+  // (ex : protocole file://, hébergement statique fermé, etc.)
+  const CATALOG_URL_DEFAULT = 'https://ade-consult.univ-artois.fr/jsp/custom/modules/plannings/ZYjybX3B.shu';
+  const FALLBACK_PRESETS = [
+    { name: 'BUT INFO 1A — Groupe C1 (Lens)', url: 'https://ade-consult.univ-artois.fr/jsp/custom/modules/plannings/rY64beWz.shu', tag: 'Lens' },
+    { name: 'BUT INFO 1A — A1', url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B1', sub: 'A1' } },
+    { name: 'BUT INFO 1A — A2', url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B1', sub: 'A2' } },
+    { name: 'BUT INFO 1A — B1', url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B1', sub: 'B1' } },
+    { name: 'BUT INFO 1A — B2', url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B1', sub: 'B2' } },
+    { name: 'BUT INFO 1A — C1', url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B1', sub: 'C1' } },
+    { name: 'BUT INFO 1A — C2', url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B1', sub: 'C2' } },
+    { name: 'BUT INFO 2A — A',  url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B2', sub: 'A'  } },
+    { name: 'BUT INFO 2A — B',  url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B2', sub: 'B'  } },
+    { name: 'BUT INFO 2A — C',  url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B2', sub: 'C'  } },
+    { name: 'BUT INFO 3A — A',  url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B3', sub: 'A'  } },
+    { name: 'BUT INFO 3A — B',  url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B3', sub: 'B'  } },
+    { name: 'BUT INFO 3A — C',  url: CATALOG_URL_DEFAULT, tag: 'Lens', filter: { year: 'B3', sub: 'C'  } }
+  ];
+
   // ---------- Utilitaires ----------
   function toast(msg, ms = 2200) {
     toastEl.textContent = String(msg);
@@ -701,6 +720,11 @@
 
   function renderDay() {
     clearNode(content);
+    // === ONBOARDING : aucun profil configuré → on prend toute la place ===
+    if (!getActiveProfile()) {
+      content.appendChild(buildOnboardingPanel());
+      return;
+    }
     const list = eventsForDay(CURSOR);
     const now = new Date();
     const isToday = sameDay(CURSOR, now);
@@ -755,6 +779,10 @@
   // === Vue semaine en TIMELINE (style Google Calendar) ===
   function renderWeek() {
     clearNode(content);
+    if (!getActiveProfile()) {
+      content.appendChild(buildOnboardingPanel());
+      return;
+    }
     const start = startOfWeek(CURSOR);
     const today = new Date();
     const HOUR_PX = 56;
@@ -896,6 +924,66 @@
       const offset = Math.max(0, (targetH - minH - 1) * HOUR_PX);
       window.scrollTo({ top: window.scrollY + offset, behavior: 'auto' });
     });
+  }
+
+  // === Panneau d'accueil inline : impossible à louper ===
+  function buildOnboardingPanel() {
+    const wrap = document.createElement('section');
+    wrap.className = 'onboarding glass';
+
+    const head = document.createElement('div');
+    head.className = 'onboarding-head';
+    const t = document.createElement('h2');
+    t.textContent = '👋 Bienvenue !';
+    const s = document.createElement('p');
+    s.textContent = 'Choisis ta classe ci-dessous, ton emploi du temps se chargera automatiquement à chaque ouverture.';
+    head.appendChild(t); head.appendChild(s);
+    wrap.appendChild(head);
+
+    const presetsAvailable = PRESETS.length ? PRESETS : FALLBACK_PRESETS;
+    if (!presetsAvailable.length) {
+      const note = document.createElement('p');
+      note.className = 'muted';
+      note.style.textAlign = 'center';
+      note.style.padding = '20px';
+      note.textContent = 'Aucune classe disponible. Configure une URL ADE dans ⚙ Réglages.';
+      wrap.appendChild(note);
+      return wrap;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'onboarding-list';
+    for (const preset of presetsAvailable) {
+      const li = document.createElement('li');
+      li.className = 'preset-row';
+
+      const name = document.createElement('span');
+      name.className = 'pname';
+      name.textContent = preset.name;
+      li.appendChild(name);
+      if (preset.tag) {
+        const tag = document.createElement('span');
+        tag.className = 'ptag';
+        tag.textContent = preset.tag;
+        li.appendChild(tag);
+      }
+      li.addEventListener('click', async () => {
+        haptic(10);
+        let safeUrl;
+        try { safeUrl = safeIcsUrl(preset.url); }
+        catch (e) { toast('URL invalide : ' + e.message); return; }
+        const p = addProfile({ name: preset.name, type: 'ics', url: safeUrl, filter: preset.filter || null });
+        EVENTS = [];
+        refreshProfileChip();
+        render();
+        toast(`Classe « ${p.name} » ajoutée`);
+        const ok = await autoRefresh({ silent: false });
+        if (ok) { ensureModuleColors(); jumpToMostRelevantDate(); render(); }
+      });
+      list.appendChild(li);
+    }
+    wrap.appendChild(list);
+    return wrap;
   }
 
   function buildEmpty(title, sub) {
