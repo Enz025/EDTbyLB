@@ -1398,6 +1398,51 @@ textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-siz
   border: 1px solid var(--border);
 }
 
+/* === Force la couleur du thème dans tous les dialogues ===
+   <dialog> a un color: CanvasText par défaut qui devient NOIR en dark
+   mode → tous les <h2>, <h3>, <label>, <p>, <li>, <details>, <summary>
+   rendaient en noir et étaient illisibles.
+   Solution : on ré-applique --fg sur tous les dialogues et leurs descendants. */
+dialog,
+dialog h1, dialog h2, dialog h3, dialog h4,
+dialog p, dialog li, dialog label, dialog span,
+dialog summary, dialog details,
+.glass h1, .glass h2, .glass h3, .glass h4,
+.settings-form, .settings-form *,
+.profile-form, .profile-form *,
+.details-content, .details-content * {
+  color: var(--fg);
+}
+/* Mais on PRÉSERVE les couleurs spéciales explicites (badges, muted, accents)  */
+dialog .muted, dialog .pause-hint, dialog .kv .k,
+.settings-form .muted, .profile-form .muted,
+.details-content .desc {
+  color: var(--muted);
+}
+.details-content .kv .v, .details-content h2 { color: var(--fg); }
+.details-content .desc { color: var(--fg-soft); }
+.badge, .badge-sub, .ptag, .hero-tag, .hero-dist,
+.pause-midi .pause-hint, .tuto a {
+  /* couleurs spécifiques déjà définies — ne pas écraser via .glass * */
+  color: inherit;
+}
+/* Input/textarea dans dialogues : forcer texte lisible */
+dialog input, dialog textarea {
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+dialog input::placeholder, dialog textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+/* Code monospace dans tuto Artois */
+.tuto code, dialog code {
+  color: var(--fg);
+  background: var(--card-strong);
+  border: 1px solid var(--border);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
