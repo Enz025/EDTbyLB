@@ -12,7 +12,7 @@
   <meta name="referrer" content="no-referrer" />
 
   <!-- PWA -->
-  <link rel="manifest" href="manifest.json?v=2.1.0" />
+  <link rel="manifest" href="manifest.json?v=2.2.0" />
   <meta name="theme-color" content="#0a0a0f" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#f7f7fb" media="(prefers-color-scheme: light)" />
 
@@ -27,9 +27,9 @@
   <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png" />
 
   <title>EDT</title>
-  <link rel="stylesheet" href="style.css?v=2.1.0" />
+  <link rel="stylesheet" href="style.css?v=2.2.0" />
   <!-- Kill switch chargé AVANT app.js : marche même si app.js est encore en cache ancien -->
-  <script src="reset.js?v=2.1.0"></script>
+  <script src="reset.js?v=2.2.0"></script>
 </head>
 <body>
   <div class="app" id="app">
@@ -145,6 +145,21 @@
       </form>
     </dialog>
 
+    <dialog id="crousDlg" class="profile-dlg">
+      <form method="dialog" class="profile-form glass">
+        <header class="profile-head">
+          <h2>🍽 Menu RU Lens</h2>
+          <button type="submit" class="icon-btn" aria-label="Fermer">✕</button>
+        </header>
+        <p class="muted" id="crousDate">—</p>
+        <div id="crousContent" class="crous-modal-content">—</div>
+        <div class="row right">
+          <a class="btn" href="https://www.crous-lille.fr/restaurant/r-u-de-lens/" target="_blank" rel="noopener noreferrer">Voir sur crous-lille.fr</a>
+          <button type="submit" class="btn primary">Fermer</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="profileDlg" class="profile-dlg">
       <form method="dialog" class="profile-form glass">
         <header class="profile-head">
@@ -181,6 +196,6 @@
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>
 
-  <script src="app.js?v=2.1.0" defer></script>
+  <script src="app.js?v=2.2.0" defer></script>
 </body>
 </html>

@@ -10,7 +10,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 'v2.1.0';
+  const APP_VERSION = 'v2.2.0';
 
   // === Kill switch : ?reset purge tout (SW, caches, localStorage) ===
   // Permet de débloquer un user coincé sur une ancienne version cachée.
@@ -102,6 +102,9 @@
   const profileBtn = $('#profileBtn');
   const profileName= $('#profileName');
   const profileDlg = $('#profileDlg');
+  const crousDlg = $('#crousDlg');
+  const crousDate = $('#crousDate');
+  const crousContent = $('#crousContent');
   const profileList= $('#profileList');
   const addProfileDetails = $('#addProfileDetails');
   const newProfileName = $('#newProfileName');
@@ -877,6 +880,64 @@
     return wrap;
   }
 
+  // Construit le contenu menu (catégories + plats) pour la modale
+  function buildCrousContent(dateISO) {
+    const wrap = document.createElement('div');
+    const cats = CROUS_MENUS[dateISO];
+    if (!cats || !cats.length) {
+      const p = document.createElement('p');
+      p.className = 'muted';
+      p.style.textAlign = 'center';
+      p.style.padding = '20px';
+      p.textContent = 'Menu non disponible pour ce jour.';
+      wrap.appendChild(p);
+      return wrap;
+    }
+    for (const cat of cats) {
+      const sec = document.createElement('div'); sec.className = 'crous-cat';
+      const cName = document.createElement('div'); cName.className = 'crous-cat-name';
+      cName.textContent = cat.name;
+      sec.appendChild(cName);
+      const list = document.createElement('ul'); list.className = 'crous-dishes';
+      for (const d of cat.dishes) {
+        const li = document.createElement('li');
+        li.textContent = prettyDish(d);
+        list.appendChild(li);
+      }
+      sec.appendChild(list);
+      wrap.appendChild(sec);
+    }
+    return wrap;
+  }
+
+  // Ouvre la modale du menu CROUS du jour
+  async function openCrousModal(dateISO) {
+    haptic(8);
+    // Date lisible
+    if (crousDate) {
+      const d = parseISODate(dateISO);
+      crousDate.textContent = d
+        ? d.toLocaleDateString('fr-FR', { weekday:'long', day:'2-digit', month:'long' })
+        : '';
+    }
+    // Charge si pas déjà en cache
+    if (!Object.keys(CROUS_MENUS).length) {
+      crousContent.replaceChildren(Object.assign(document.createElement('p'), {
+        className: 'muted', textContent: 'Chargement du menu…',
+        style: 'text-align:center;padding:20px'
+      }));
+      if (typeof crousDlg.showModal === 'function' && !crousDlg.open) crousDlg.showModal();
+      await loadCrousMenu();
+    }
+    crousContent.replaceChildren(buildCrousContent(dateISO));
+    if (!crousDlg.open) {
+      try {
+        if (typeof crousDlg.showModal === 'function') crousDlg.showModal();
+        else crousDlg.setAttribute('open', '');
+      } catch { crousDlg.setAttribute('open', ''); }
+    }
+  }
+
   function prettyDish(s) {
     if (!s) return '';
     const lower = s.toLocaleLowerCase('fr-FR');
@@ -884,12 +945,66 @@
     return lower.charAt(0).toLocaleUpperCase('fr-FR') + lower.slice(1);
   }
 
-  function buildPauseCard(ms) {
+  // Détecte le type de pause selon l'heure de début et la durée
+  function detectPauseType(prevEnd, nextStart) {
+    const startH = prevEnd.getHours() + prevEnd.getMinutes() / 60;
+    const durMin = (nextStart - prevEnd) / 60000;
+    // Pause midi : commence 11h30-13h00 et dure ≥ 45 min
+    if (startH >= 11.5 && startH <= 13 && durMin >= 45) return 'midi';
+    // Pause après-midi : commence ≥ 14h, dure ≥ 30 min
+    if (startH >= 14 && durMin >= 30) return 'after';
+    // Pause longue
+    if (durMin >= 30) return 'long';
+    // Pause courte (15-30 min)
+    if (durMin >= 15) return 'short';
+    return null;
+  }
+
+  function buildPauseCard(prevEv, nextEv, dateISO) {
+    const ms = nextEv.start - prevEv.end;
+    const type = detectPauseType(prevEv.end, nextEv.start);
+    if (!type) return null;
+
     const el = document.createElement('div');
-    el.className = 'pause';
+    el.className = 'pause pause-' + type;
+
+    let icon = '', label = 'Pause';
+    if (type === 'midi')       { icon = '🍽'; label = 'Pause déjeuner'; }
+    else if (type === 'after') { icon = '☕'; label = 'Pause'; }
+    else if (type === 'short') { icon = '·';  label = 'Petite pause'; }
+    else                       { icon = '·';  label = 'Pause'; }
+
     const txt = document.createElement('span');
-    txt.textContent = `Pause · ${fmtDuration(ms)}`;
+    txt.className = 'pause-text';
+    txt.textContent = `${icon} ${label} · ${fmtDuration(ms)}`;
     el.appendChild(txt);
+
+    // Pause déjeuner → ouvre la modale CROUS au tap
+    if (type === 'midi') {
+      el.classList.add('clickable');
+      el.setAttribute('role', 'button');
+      el.tabIndex = 0;
+      const hint = document.createElement('span');
+      hint.className = 'pause-hint';
+      hint.textContent = 'Voir menu RU →';
+      el.appendChild(hint);
+      const open = () => openCrousModal(dateISO);
+      el.addEventListener('click', open);
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    }
+    return el;
+  }
+
+  // Indicateur "après-midi libre" en bas du jour
+  function buildFreeAfternoonCard(endTime) {
+    const el = document.createElement('div');
+    el.className = 'free-afternoon glass';
+    const icon = document.createElement('span'); icon.className = 'fa-icon'; icon.textContent = '🏖';
+    const txt = document.createElement('div'); txt.className = 'fa-text';
+    const t = document.createElement('strong'); t.textContent = 'Après-midi libre';
+    const s = document.createElement('span'); s.textContent = `Fini à ${fmtTime(endTime)}, profite bien !`;
+    txt.appendChild(t); txt.appendChild(s);
+    el.appendChild(icon); el.appendChild(txt);
     return el;
   }
 
@@ -1010,19 +1125,25 @@
       if (next) content.appendChild(buildNextCourseCard(next, now));
     }
 
-    // 🍽 Menu CROUS R.U. Lens du jour
-    const crous = buildCrousCard(toISODate(CURSOR));
-    if (crous) content.appendChild(crous);
-
-    // Cours + pauses ≥ 30 min
-    const PAUSE_THRESHOLD = 30 * 60 * 1000;
+    // Cours + pauses (≥ 15 min) avec type (midi / après-midi / courte / longue)
+    const PAUSE_THRESHOLD = 15 * 60 * 1000;
+    const dateISO = toISODate(CURSOR);
     for (let i = 0; i < list.length; i++) {
       const ev = list[i];
       content.appendChild(buildCourseCard(ev, false, now));
       if (i < list.length - 1) {
         const gap = list[i + 1].start - ev.end;
-        if (gap >= PAUSE_THRESHOLD) content.appendChild(buildPauseCard(gap));
+        if (gap >= PAUSE_THRESHOLD) {
+          const pauseCard = buildPauseCard(ev, list[i + 1], dateISO);
+          if (pauseCard) content.appendChild(pauseCard);
+        }
       }
+    }
+
+    // « Après-midi libre » si le dernier cours finit avant 15h
+    const last = list[list.length - 1];
+    if (last && last.end.getHours() < 15 && !isWeekend) {
+      content.appendChild(buildFreeAfternoonCard(last.end));
     }
   }
 
