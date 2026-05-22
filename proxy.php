@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 const ALLOWED_HOSTS = [
     'ade-consult.univ-artois.fr',
-    // ajoute ici d'autres instances si besoin (ex : vtiutb.univ-artois.fr)
+    'www.crous-lille.fr',  // menus RU Lens
 ];
 
 const CACHE_TTL = 300;          // 5 minutes
@@ -67,7 +67,12 @@ if (!is_dir($cacheDir)) @mkdir($cacheDir, 0700, true);
 $cacheFile = $cacheDir . '/' . hash('sha256', $targetUrl) . '.ics';
 
 if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < CACHE_TTL) {
-    header('Content-Type: text/calendar; charset=utf-8');
+    // Détermine le type du fichier caché en sniffant les premiers octets
+    $sniff = file_get_contents($cacheFile, false, null, 0, 32) ?: '';
+    $cachedCT = (strpos($sniff, 'BEGIN:VCALENDAR') === 0)
+        ? 'text/calendar; charset=utf-8'
+        : 'text/html; charset=utf-8';
+    header('Content-Type: ' . $cachedCT);
     header('Cache-Control: private, max-age=' . CACHE_TTL);
     header('X-Cache: HIT');
     readfile($cacheFile);
@@ -119,14 +124,18 @@ if ($err !== '' || $code < 200 || $code >= 400) {
     exit('Upstream error.');
 }
 
-// On vérifie que le contenu ressemble bien à de l'iCalendar
-if (strpos($body, 'BEGIN:VCALENDAR') === false) {
+// Détermine le content-type à renvoyer en fonction du contenu upstream
+$isIcs = strpos($body, 'BEGIN:VCALENDAR') !== false;
+$isCrous = strpos(strtolower($parts['host']), 'crous') !== false;
+
+if (!$isIcs && !$isCrous) {
     http_response_code(502);
-    exit('Upstream did not return iCalendar data.');
+    exit('Upstream did not return expected data.');
 }
 
 // --------- Réponse ---------
-header('Content-Type: text/calendar; charset=utf-8');
+$respCT = $isIcs ? 'text/calendar; charset=utf-8' : 'text/html; charset=utf-8';
+header('Content-Type: ' . $respCT);
 header('Cache-Control: private, max-age=' . CACHE_TTL);
 header('X-Cache: MISS');
 

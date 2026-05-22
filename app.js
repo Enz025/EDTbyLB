@@ -10,7 +10,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 'v1.9.5';
+  const APP_VERSION = 'v2.1.0';
 
   // === Kill switch : ?reset purge tout (SW, caches, localStorage) ===
   // Permet de débloquer un user coincé sur une ancienne version cachée.
@@ -421,7 +421,8 @@
   // pour éviter les blocages CORS depuis le navigateur. Doit rester synchronisé
   // avec la whitelist ALLOWED_HOSTS de proxy.php.
   const PROXIED_HOSTS = new Set([
-    'ade-consult.univ-artois.fr'
+    'ade-consult.univ-artois.fr',
+    'www.crous-lille.fr'
   ]);
 
   // Validation stricte d'URL .ics : HTTPS uniquement, pas de credentials
@@ -530,9 +531,31 @@
 
   function extractTeacher(desc) {
     if (!desc) return '';
-    // Heuristique : ADE met souvent "Enseignant : NOM" ou listes capitalisées
-    const m = /(?:enseignant|prof(?:esseur)?)\s*[:\-]\s*([^\n]+)/i.exec(desc);
-    if (m) return clean(m[1], 120);
+    // 1) "Enseignant : NOM" explicite (rare chez ADE Artois)
+    const m1 = /(?:enseignant|prof(?:esseur)?)\s*[:\-]\s*([^\n]+)/i.exec(desc);
+    if (m1) return clean(m1[1], 120);
+
+    // 2) ADE Artois : nom du prof sur sa propre ligne entre "Groupe X-Y-Z" et "Transféré".
+    // Format observé :
+    //   B1INFOS1TPB1
+    //   Groupe 1-B-1
+    //   Lipowski Cyrielle        ← ce qu'on veut
+    //   Transféré
+    //   (Exporté le:20/05/2026 22:49)
+    const SKIP = /^(transf[ée]r[ée]|annul[ée]|export[ée]|s[ée]ance|attention|cours\s+annul|groupe\b)/i;
+    const META = /^[#(]|^https?:\/\//;
+    const GROUP = /^([A-Z]+\d+)+[A-Z0-9]*$/; // codes du genre B1INFOS1TPC1
+    const RX_NAME = /^[A-ZÀ-Ÿ][\p{L}'\-]+(\s+[A-ZÀ-Ÿ][\p{L}'\-]+){1,4}$/u;
+    const names = [];
+    for (let line of desc.split(/\r?\n/)) {
+      line = line.trim();
+      if (!line || line.length < 4 || line.length > 60) continue;
+      if (SKIP.test(line))  continue;
+      if (META.test(line))  continue;
+      if (GROUP.test(line)) continue;
+      if (RX_NAME.test(line)) names.push(line);
+    }
+    if (names.length) return clean(names.join(' · '), 120);
     return '';
   }
 
@@ -657,30 +680,208 @@
     const s = dayStats(list);
     const wrap = document.createElement('div');
     wrap.className = 'day-summary glass';
+
+    const row = document.createElement('div'); row.className = 'stats-row';
     const mk = (val, label) => {
       const st = document.createElement('div'); st.className = 'stat';
       const b  = document.createElement('strong'); b.textContent = val;
       const sp = document.createElement('span'); sp.textContent = label;
       st.appendChild(b); st.appendChild(sp); return st;
     };
-    wrap.appendChild(mk(String(s.count), s.count > 1 ? 'cours' : 'cours'));
+    row.appendChild(mk(String(s.count), s.count > 1 ? 'cours' : 'cours'));
     const dur = s.minutes ? `${s.hours}h${String(s.minutes).padStart(2,'0')}` : `${s.hours}h`;
-    wrap.appendChild(mk(dur, 'de cours'));
+    row.appendChild(mk(dur, 'de cours'));
+
+    // 3e stat : nombre de matières uniques aujourd'hui
+    const modules = new Set();
+    for (const ev of list) {
+      const c = extractModuleCode(ev.title);
+      if (c) modules.add(c);
+    }
+    if (modules.size) row.appendChild(mk(String(modules.size), modules.size > 1 ? 'matières' : 'matière'));
+    wrap.appendChild(row);
+
+    // Mini-pills des modules du jour, dans l'ordre d'apparition, avec leur couleur
+    if (modules.size) {
+      const seen = new Set();
+      const pills = document.createElement('div'); pills.className = 'module-pills';
+      for (const ev of list) {
+        const c = extractModuleCode(ev.title);
+        if (!c || seen.has(c)) continue;
+        seen.add(c);
+        const pill = document.createElement('span');
+        pill.className = 'module-pill';
+        pill.style.setProperty('--type-color', colorForModule(c) || 'var(--other)');
+        pill.textContent = c;
+        pills.appendChild(pill);
+      }
+      wrap.appendChild(pills);
+    }
     return wrap;
   }
 
+  // === Hero "Prochain cours" — gros widget visuel avec countdown ===
   function buildNextCourseCard(ev, now = new Date()) {
     const diffMs = ev.start - now;
-    const wrap = document.createElement('div');
-    wrap.className = 'next-course';
-    const arrow = document.createElement('span'); arrow.className = 'arrow'; arrow.textContent = '→';
-    const txt = document.createElement('span');
-    const strong = document.createElement('strong'); strong.textContent = 'Prochain : ';
-    txt.appendChild(strong);
-    txt.appendChild(document.createTextNode(`${ev.title} dans ${fmtDuration(diffMs)}`));
-    if (ev.room) txt.appendChild(document.createTextNode(` · ${ev.room}`));
-    wrap.appendChild(arrow); wrap.appendChild(txt);
+    const { color, label, secondary } = resolveBadge(ev);
+
+    const wrap = document.createElement('article');
+    wrap.className = 'hero-next glass';
+    wrap.style.setProperty('--type-color', color);
+    wrap.setAttribute('role', 'button');
+    wrap.tabIndex = 0;
+    wrap.addEventListener('click', () => openDetails(ev));
+
+    // Bandeau supérieur : "PROCHAIN COURS · dans 2h35"
+    const top = document.createElement('div'); top.className = 'hero-top';
+    const tag = document.createElement('span'); tag.className = 'hero-tag';
+    tag.textContent = 'Prochain cours';
+    const dist = document.createElement('span'); dist.className = 'hero-dist';
+    dist.textContent = `dans ${fmtDuration(diffMs)}`;
+    top.appendChild(tag); top.appendChild(dist);
+    wrap.appendChild(top);
+
+    // Ligne badges (module + type)
+    const badges = document.createElement('div'); badges.className = 'hero-badges';
+    const b1 = document.createElement('span'); b1.className = 'badge'; b1.textContent = label;
+    badges.appendChild(b1);
+    if (secondary) {
+      const b2 = document.createElement('span'); b2.className = 'badge-sub'; b2.textContent = secondary;
+      badges.appendChild(b2);
+    }
+    wrap.appendChild(badges);
+
+    // Titre cours (sans code module dupliqué)
+    const cleanTitle = ev.title.replace(/^\s*[A-Z]{1,5}\d+(?:\.\d+)?\s*[:\-–—]?\s*/i, '').trim() || ev.title;
+    const h = document.createElement('h2'); h.className = 'hero-title';
+    h.textContent = cleanTitle;
+    wrap.appendChild(h);
+
+    // Ligne info : horaire, salle, prof
+    const info = document.createElement('div'); info.className = 'hero-info';
+    const time = document.createElement('span'); time.className = 'hero-time';
+    time.textContent = `${fmtTime(ev.start)} — ${fmtTime(ev.end)}`;
+    info.appendChild(time);
+    if (ev.room) {
+      const r = document.createElement('span'); r.className = 'hero-meta';
+      r.textContent = '📍 ' + ev.room;
+      info.appendChild(r);
+    }
+    if (ev.teacher) {
+      const t = document.createElement('span'); t.className = 'hero-meta';
+      t.textContent = '👤 ' + ev.teacher;
+      info.appendChild(t);
+    }
+    wrap.appendChild(info);
+
     return wrap;
+  }
+
+  // ============================================================
+  // MENU CROUS — R.U. de Lens
+  // ============================================================
+  const CROUS_URL = 'https://www.crous-lille.fr/restaurant/r-u-de-lens/';
+  const CROUS_CACHE_KEY = 'edt.crous.v1';
+  const CROUS_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 heures
+  let CROUS_MENUS = {}; // { "YYYY-MM-DD": [{name:"ENTREES", dishes:[...]}, ...] }
+
+  // Parse le var_dump PHP exposé dans la page HTML CROUS Lille pour extraire
+  // un mapping date → catégories → plats. Structure observée :
+  //   ["date"]=> string(10) "2026-05-26"
+  //     ["meal"]=> array(...) { ... "midi" ... ["foodcategory"]=> array(...) {
+  //       ["name"]=> "ENTREES"
+  //       ["dishes"]=> array(N) { ["name"]=> "DISH1" ... }
+  //       ["name"]=> "PLATS"
+  //       ["dishes"]=> array(M) { ... }
+  //     }}
+  function parseCrousMenu(html) {
+    const out = {};
+    if (typeof html !== 'string') return out;
+    const dateBlock = /\["date"\]=>\s*string\(\d+\)\s*"(\d{4}-\d{2}-\d{2})"([\s\S]*?)(?=\["date"\]=>|$)/g;
+    const catRe  = /\["name"\]=>\s*string\(\d+\)\s*"([A-ZÉÈÊÀÂÎÏÔÛÇ][A-ZÉÈÊÀÂÎÏÔÛÇ\s'’-]*?)"\s*\["dishes"\]=>\s*array\(\d+\)\s*\{/g;
+    const dishRe = /\["name"\]=>\s*string\(\d+\)\s*"([^"]+)"/g;
+    let dm;
+    while ((dm = dateBlock.exec(html))) {
+      const date = dm[1];
+      const section = dm[2];
+      catRe.lastIndex = 0;
+      const cats = [];
+      const matches = [];
+      let cm;
+      while ((cm = catRe.exec(section))) {
+        matches.push({ name: cm[1].trim(), bodyStart: cm.index + cm[0].length });
+      }
+      for (let i = 0; i < matches.length; i++) {
+        const end = (i + 1 < matches.length) ? matches[i + 1].bodyStart : section.length;
+        const body = section.slice(matches[i].bodyStart, end);
+        const dishes = [];
+        dishRe.lastIndex = 0;
+        let dm2;
+        while ((dm2 = dishRe.exec(body))) dishes.push(dm2[1].trim());
+        if (dishes.length) cats.push({ name: matches[i].name, dishes });
+      }
+      if (cats.length) out[date] = cats;
+    }
+    return out;
+  }
+
+  // Charge le menu CROUS — depuis le cache si < 6h, sinon refetch via proxy
+  async function loadCrousMenu({ force = false } = {}) {
+    let cache = null;
+    try { cache = JSON.parse(localStorage.getItem(CROUS_CACHE_KEY) || 'null'); } catch {}
+    if (!force && cache && cache.fetchedAt && (Date.now() - cache.fetchedAt) < CROUS_CACHE_TTL_MS) {
+      CROUS_MENUS = cache.menus || {};
+      return;
+    }
+    try {
+      const fetchUrl = resolveFetchUrl(CROUS_URL);
+      const res = await fetch(fetchUrl, { credentials: 'omit', redirect: 'follow' });
+      if (!res.ok) return;
+      const html = await res.text();
+      const menus = parseCrousMenu(html);
+      if (Object.keys(menus).length) {
+        CROUS_MENUS = menus;
+        try { localStorage.setItem(CROUS_CACHE_KEY, JSON.stringify({ fetchedAt: Date.now(), menus })); } catch {}
+      }
+    } catch {/* silencieux : pas de menu, pas grave */}
+  }
+
+  function buildCrousCard(dateISO) {
+    const cats = CROUS_MENUS[dateISO];
+    if (!cats || !cats.length) return null;
+    const wrap = document.createElement('section');
+    wrap.className = 'crous-card glass';
+    const head = document.createElement('div'); head.className = 'crous-head';
+    const ttl = document.createElement('h3'); ttl.className = 'crous-title';
+    ttl.textContent = '🍽 Menu R.U. Lens';
+    const sub = document.createElement('span'); sub.className = 'crous-sub';
+    sub.textContent = 'déjeuner';
+    head.appendChild(ttl); head.appendChild(sub);
+    wrap.appendChild(head);
+
+    for (const cat of cats) {
+      const sec = document.createElement('div'); sec.className = 'crous-cat';
+      const cName = document.createElement('div'); cName.className = 'crous-cat-name';
+      cName.textContent = cat.name;
+      sec.appendChild(cName);
+      const list = document.createElement('ul'); list.className = 'crous-dishes';
+      for (const d of cat.dishes) {
+        const li = document.createElement('li');
+        // Capitalise joliment ("SALADE DE PATES" → "Salade de pâtes" approximatif)
+        li.textContent = prettyDish(d);
+        list.appendChild(li);
+      }
+      sec.appendChild(list);
+      wrap.appendChild(sec);
+    }
+    return wrap;
+  }
+
+  function prettyDish(s) {
+    if (!s) return '';
+    const lower = s.toLocaleLowerCase('fr-FR');
+    // Capitalise première lettre uniquement
+    return lower.charAt(0).toLocaleUpperCase('fr-FR') + lower.slice(1);
   }
 
   function buildPauseCard(ms) {
@@ -769,25 +970,32 @@
     const isWeekend = CURSOR.getDay() === 0 || CURSOR.getDay() === 6;
 
     if (!list.length) {
+      const emoji = isWeekend ? '🏖' : (isToday ? '🌤' : '📅');
       const title = isWeekend ? 'Week-end' : (isToday ? 'Journée libre' : 'Pas de cours');
       const sub   = isWeekend ? 'Profite bien !' : (isToday ? "Rien au programme aujourd'hui." : 'Aucun cours prévu ce jour.');
-      content.appendChild(buildEmpty(title, sub));
+      content.appendChild(buildEmpty(`${emoji} ${title}`, sub));
 
-      // Si on a quand même un EDT chargé, propose un raccourci vers le prochain cours
+      // Empty state intelligent : si l'EDT a un prochain cours, montre-le bien visible
       if (EVENTS.length) {
         const upcoming = [...EVENTS].sort((a, b) => a.start - b.start).find(ev => ev.start >= now);
-        const target = upcoming || [...EVENTS].sort((a, b) => b.start - a.start)[0];
-        if (target && !sameDay(target.start, CURSOR)) {
-          const btn = document.createElement('button');
-          btn.className = 'btn primary';
-          btn.style.alignSelf = 'center';
-          btn.textContent = upcoming
-            ? `→ Aller au prochain cours (${target.start.toLocaleDateString('fr-FR', {weekday:'short', day:'2-digit', month:'short'})})`
-            : `→ Voir le dernier cours (${target.start.toLocaleDateString('fr-FR', {weekday:'short', day:'2-digit', month:'short'})})`;
-          btn.addEventListener('click', () => {
-            CURSOR = new Date(target.start); CURSOR.setHours(0,0,0,0); render();
-          });
-          content.appendChild(btn);
+        if (upcoming && !sameDay(upcoming.start, CURSOR)) {
+          // Mini hero card "Prochain cours" cliquable, mais marqué comme "à venir"
+          const card = buildNextCourseCard(upcoming, now);
+          card.classList.add('hero-distant');
+          // Remplace le tag "Prochain cours" par "À venir · jour" pour clarifier
+          const tag = card.querySelector('.hero-tag');
+          const dist = card.querySelector('.hero-dist');
+          if (tag) tag.textContent = 'À venir';
+          if (dist) {
+            const d = new Date(upcoming.start);
+            dist.textContent = `${d.toLocaleDateString('fr-FR', {weekday:'long', day:'2-digit', month:'short'})} à ${fmtTime(upcoming.start)}`;
+          }
+          // Tap = navigate to that day
+          card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            CURSOR = new Date(upcoming.start); CURSOR.setHours(0,0,0,0); render();
+          }, true);
+          content.appendChild(card);
         }
       }
       return;
@@ -801,6 +1009,10 @@
       const next = list.find(ev => ev.start > now);
       if (next) content.appendChild(buildNextCourseCard(next, now));
     }
+
+    // 🍽 Menu CROUS R.U. Lens du jour
+    const crous = buildCrousCard(toISODate(CURSOR));
+    if (crous) content.appendChild(crous);
 
     // Cours + pauses ≥ 30 min
     const PAUSE_THRESHOLD = 30 * 60 * 1000;
@@ -1674,6 +1886,9 @@
     updateStorageInfo();
     // Auto-refresh silencieux au démarrage si une URL ADE est configurée
     autoRefresh({ silent: true }).then(ok => { if (ok) { ensureModuleColors(); render(); } });
+
+    // Charge le menu CROUS en arrière-plan (silencieux, ne bloque pas l'app)
+    loadCrousMenu().then(() => { if (getActiveProfile()) render(); });
 
     // === Onboarding : si aucune classe configurée, ouvre auto le menu ===
     // (Geste utilisateur attendu pour showModal sur certains navigateurs,

@@ -3,7 +3,7 @@
    - App shell (HTML/CSS/JS/manifest/icons) : cache-first
    - Données .ics : network-first avec fallback cache (pour rester utilisable hors-ligne) */
 
-const VERSION = 'edt-v1.9.5';
+const VERSION = 'edt-v2.1.0';
 const SHELL_CACHE = `shell-${VERSION}`;
 const DATA_CACHE  = `data-${VERSION}`;
 

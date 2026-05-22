@@ -603,9 +603,19 @@ input:focus, textarea:focus { border-color: var(--accent); }
     color-mix(in srgb, var(--type-color, var(--other)) 70%, transparent));
 }
 @keyframes card-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+/* Délai d'apparition en cascade pour les cartes successives dans #content */
+.content > * { animation-delay: 0ms; }
+.content > *:nth-child(2) { animation-delay: 40ms; }
+.content > *:nth-child(3) { animation-delay: 80ms; }
+.content > *:nth-child(4) { animation-delay: 120ms; }
+.content > *:nth-child(5) { animation-delay: 160ms; }
+.content > *:nth-child(6) { animation-delay: 200ms; }
+.content > *:nth-child(7) { animation-delay: 240ms; }
+.content > *:nth-child(8) { animation-delay: 280ms; }
+.content > *:nth-child(n+9) { animation-delay: 320ms; }
 .course .row1 {
   display: flex;
   justify-content: space-between;
@@ -727,17 +737,23 @@ input:focus, textarea:focus { border-color: var(--accent); }
   border-top: 1.5px dashed color-mix(in srgb, var(--muted) 50%, transparent);
 }
 
-/* === Résumé / prochain cours === */
+/* === Résumé du jour === */
 .day-summary {
   display: flex;
-  gap: 18px;
-  padding: 10px 16px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
   font-size: 13px;
   color: var(--fg-soft);
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  align-items: center;
+  animation: card-in .3s cubic-bezier(.2,.8,.2,1) both;
+}
+.stats-row {
+  display: flex;
+  gap: 20px;
+  align-items: baseline;
 }
 .day-summary .stat {
   display: flex;
@@ -748,37 +764,202 @@ input:focus, textarea:focus { border-color: var(--accent); }
   color: var(--fg);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  font-size: 17px;
+  font-size: 20px;
   letter-spacing: -0.01em;
 }
 .day-summary .stat span {
-  font-size: 11px;
+  font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   color: var(--muted);
   margin-top: 2px;
+  font-weight: 600;
 }
-.next-course {
+
+/* Mini-pills des modules du jour */
+.module-pills {
   display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.module-pill {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--type-color, var(--other)) 18%, transparent);
+  color: var(--type-color, var(--other));
+  border: 1px solid color-mix(in srgb, var(--type-color, var(--other)) 30%, transparent);
+  text-transform: uppercase;
+}
+
+/* === Menu CROUS du jour === */
+.crous-card {
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
   background:
     linear-gradient(135deg,
-      color-mix(in srgb, var(--accent) 18%, transparent),
+      color-mix(in srgb, #ff9500 14%, transparent),
       transparent 70%),
     var(--card-strong);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
+  border: 1px solid color-mix(in srgb, #ff9500 25%, var(--border));
+  animation: card-in .3s cubic-bezier(.2,.8,.2,1) both;
+}
+.crous-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.crous-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--fg);
 }
-.next-course .arrow {
-  font-size: 18px;
-  color: var(--accent);
-  line-height: 1;
+.crous-sub {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ff9500;
+  background: color-mix(in srgb, #ff9500 14%, transparent);
+  padding: 3px 8px;
+  border-radius: 999px;
 }
-.next-course strong { color: var(--accent); font-weight: 700; }
+.crous-cat { margin-bottom: 10px; }
+.crous-cat:last-child { margin-bottom: 0; }
+.crous-cat-name {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.crous-dishes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.crous-dishes li {
+  font-size: 13.5px;
+  color: var(--fg);
+  padding-left: 12px;
+  position: relative;
+  line-height: 1.4;
+}
+.crous-dishes li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #ff9500;
+  font-weight: 700;
+}
+
+/* === Hero "Prochain cours" — gros widget visuel === */
+.hero-next {
+  position: relative;
+  padding: 16px 18px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 100% 0%,
+      color-mix(in srgb, var(--type-color, var(--accent)) 28%, transparent),
+      transparent 70%),
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--type-color, var(--accent)) 12%, transparent),
+      transparent 70%),
+    var(--card-strong);
+  border: 1px solid color-mix(in srgb, var(--type-color, var(--accent)) 30%, var(--border));
+  box-shadow:
+    0 2px 8px color-mix(in srgb, var(--type-color, var(--accent)) 10%, transparent),
+    0 8px 24px color-mix(in srgb, var(--type-color, var(--accent)) 15%, transparent);
+  animation: card-in .35s cubic-bezier(.2,.8,.2,1) both;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.hero-next:active { transform: scale(0.985); }
+.hero-next::after {
+  /* halo lumineux subtil en coin */
+  content: '';
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 140px; height: 140px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--type-color, var(--accent)) 40%, transparent), transparent 70%);
+  filter: blur(20px);
+  pointer-events: none;
+  opacity: 0.6;
+}
+.hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}
+.hero-tag {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hero-dist {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--type-color, var(--accent));
+  background: color-mix(in srgb, var(--type-color, var(--accent)) 14%, transparent);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.hero-badges {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}
+.hero-title {
+  margin: 0 0 10px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  color: var(--fg);
+  position: relative;
+  z-index: 1;
+}
+.hero-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 13px;
+  color: var(--fg-soft);
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+.hero-time {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+.hero-meta { color: var(--fg-soft); }
+.hero-next.hero-distant {
+  /* version moins flashy pour les jours sans cours */
+  opacity: 0.95;
+}
+.hero-next.hero-distant::after { opacity: 0.4; }
 
 /* === Empty / Day header === */
 .day-section h2 {
@@ -791,11 +972,22 @@ input:focus, textarea:focus { border-color: var(--accent); }
 }
 .empty {
   text-align: center;
-  padding: 40px 20px;
+  padding: 48px 20px 36px;
   color: var(--muted);
   font-size: 14px;
+  background: var(--card-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  animation: card-in .4s cubic-bezier(.2,.8,.2,1) both;
 }
-.empty strong { color: var(--fg); display: block; margin-bottom: 6px; }
+.empty strong {
+  color: var(--fg);
+  display: block;
+  margin-bottom: 8px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
 
 /* === Vue semaine en TIMELINE (style Google Calendar) === */
 .week-timeline {
