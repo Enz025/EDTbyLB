@@ -10,7 +10,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = 'v2.2.1';
+  const APP_VERSION = 'v2.2.2';
 
   // === Kill switch : ?reset purge tout (SW, caches, localStorage) ===
   // Permet de débloquer un user coincé sur une ancienne version cachée.
@@ -58,7 +58,10 @@
   /** @type {Array<{id:string, title:string, type:string, start:Date, end:Date, room:string, teacher:string, description:string}>} */
   let EVENTS = [];
   let VIEW = loadStr(STORAGE_KEYS.view, 'day');
-  let CURSOR = parseISODate(loadStr(STORAGE_KEYS.cursor, toISODate(new Date()))) || new Date();
+  // À chaque ouverture, on démarre TOUJOURS sur la date du jour, peu importe
+  // ce que l'utilisateur consultait la dernière fois.
+  let CURSOR = new Date();
+  CURSOR.setHours(0, 0, 0, 0);
 
   // ---------- DOM refs ----------
   const $ = (sel) => document.querySelector(sel);
@@ -1396,7 +1399,8 @@
     renderWeekPills();
     if (VIEW === 'day') renderDay(); else renderWeek();
     saveStr(STORAGE_KEYS.view, VIEW);
-    saveStr(STORAGE_KEYS.cursor, toISODate(CURSOR));
+    // NOTE : on ne persiste plus CURSOR — l'app démarre toujours sur la date
+    // du jour à chaque ouverture (cf. let CURSOR = new Date() en init).
     // segment actif
     segBtns.forEach(b => {
       const active = b.dataset.view === VIEW;
@@ -2102,6 +2106,16 @@
     if (VIEW === 'day' && sameDay(CURSOR, new Date())) render();
   }, 60 * 1000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && VIEW === 'day' && sameDay(CURSOR, new Date())) render();
+    if (document.hidden) return;
+    const today = new Date();
+    // Si l'app a été laissée ouverte d'un jour à l'autre, ramène sur today
+    if (!sameDay(CURSOR, today)) {
+      CURSOR = new Date(today);
+      CURSOR.setHours(0, 0, 0, 0);
+      render();
+      return;
+    }
+    // Sinon, juste rafraîchir l'état "live" (cours en cours, etc.)
+    if (VIEW === 'day') render();
   });
 })();
